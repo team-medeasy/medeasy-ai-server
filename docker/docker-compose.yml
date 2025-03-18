@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  mongo:
+    image: mongo:6.0.4
+    container_name: medeasy-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: medeasy
+    volumes:
+      - mongo_data:/data/db
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      retries: 3
+      timeout: 5s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.6.2
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  fastapi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fastapi-app
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    env_file:
+      - ../.env
+    volumes:
+      - ../gemini_config.json:/gemini_config.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
+
+volumes:
+  mongo_data:
+  elastic_data:
