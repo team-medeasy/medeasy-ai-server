@@ -28,8 +28,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
       interval: 10s
-      retries: 3
-      timeout: 5s
+      retries: 10
+      timeout: 15s
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.6.2
