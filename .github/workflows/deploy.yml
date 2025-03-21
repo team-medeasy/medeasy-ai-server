@@ -1,0 +1,57 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Copy code to GCP instance
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          source: "."
+          target: "~/medeasy"
+
+      - name: SSH into GCP and configure environment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            cd ~/medeasy
+
+            # 🔹 기존 FastAPI 컨테이너 정리
+            docker compose down fastapi
+
+            # 🔹 .env 파일 생성
+            cat <<EOF > .env
+            MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_INITDB_ROOT_USERNAME }}
+            MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}
+            MONGO_HOST=${{ secrets.MONGO_HOST }}
+            MONGO_PORT=${{ secrets.MONGO_PORT }}
+            MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE }}
+
+            ELASTICSEARCH_HOST=${{ secrets.ELASTICSEARCH_HOST }}
+            ELASTICSEARCH_PORT=${{ secrets.ELASTICSEARCH_PORT }}
+
+            GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}
+            GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
+            EOF
+
+            # 🔹 Google Cloud 인증 JSON 복원
+            echo "${{ secrets.GOOGLE_CONFIG_JSON_BASE64 }}" | base64 --decode > gemini_config.json
+
+            # 🔹 FastAPI 컨테이너 다시 빌드 및 실행
+            docker compose build fastapi
+            docker compose up -d fastapi
