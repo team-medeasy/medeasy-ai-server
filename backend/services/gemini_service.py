@@ -6,6 +6,7 @@ import logging
 import io
 import re
 from typing import Dict, Any, List, Optional
+from fastapi import HTTPException
 from PIL import Image
 from google.cloud import aiplatform
 from vertexai.preview.generative_models import GenerativeModel, Part, SafetySetting, HarmCategory, HarmBlockThreshold
@@ -87,19 +88,24 @@ async def analyze_pill_image(image_path: str) -> List[Dict[str, Any]]:
         )
         
         if not response.text:
-            raise ValueError("Gemini API가 빈 응답을 반환했습니다.")
-        
+            raise HTTPException(status_code=422, detail="사진에서 의약품이 발견되지 않았습니다.")
+
         json_data = _extract_json_from_response(response.text)
-        if isinstance(json_data, dict):
-            return [json_data]
-        elif isinstance(json_data, list):
-            return json_data
-        else:
+
+        if isinstance(json_data, dict) and not json_data:
+            raise HTTPException(status_code=422, detail="사진에서 의약품이 발견되지 않았습니다.")
+        elif isinstance(json_data, list) and len(json_data) == 0:
+            raise HTTPException(status_code=422, detail="사진에서 의약품이 발견되지 않았습니다.")
+        elif not isinstance(json_data, (dict, list)):
             raise ValueError("Gemini API 응답 형식이 예상과 다릅니다.")
-    
+
+        return [json_data] if isinstance(json_data, dict) else json_data
+
+    except HTTPException:
+        raise  # 위에서 명시적으로 발생시킨 에러는 그대로 전달
     except Exception as e:
         logger.error(f"❌ 이미지 분석 오류: {e}", exc_info=True)
-        raise ValueError(f"이미지 분석 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail="이미지 분석 중 오류가 발생했습니다.")
 
 def _extract_json_from_response(response_text: str) -> Any:
     """
