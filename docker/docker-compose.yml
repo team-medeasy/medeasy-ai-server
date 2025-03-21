@@ -1,3 +1,4 @@
+# docker-compose.yml
 version: "3.8"
 
 services:
@@ -52,9 +53,9 @@ services:
       mongo:
         condition: service_started
     env_file:
-      - ../.env
+      - .env
     volumes:
-      - ../gemini_config.json:/gemini_config.json:ro
+      - ./gemini_config.json:/gemini_config.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
 

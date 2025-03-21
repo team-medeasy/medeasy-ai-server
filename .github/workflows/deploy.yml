@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: Deploy to GCP
 
 on:
@@ -31,11 +32,8 @@ jobs:
           script: |
             cd /home/${{ secrets.GCP_USERNAME }}/medeasy
 
-            # 기존 FastAPI 컨테이너 정리
-            docker-compose down fastapi || true
-
             # .env 파일 생성
-            echo "MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_INITDB_ROOT_USERNAME }}" >> .env
+            echo "MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_INITDB_ROOT_USERNAME }}" > .env
             echo "MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}" >> .env
             echo "MONGO_HOST=${{ secrets.MONGO_HOST }}" >> .env
             echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> .env
@@ -48,6 +46,12 @@ jobs:
             # Google 인증 JSON 복원
             echo "${{ secrets.GOOGLE_CONFIG_JSON_BASE64 }}" | base64 --decode > gemini_config.json
 
-            # FastAPI 재시작
-            docker-compose build fastapi
-            docker-compose up -d fastapi
+            # FastAPI만 재배포 또는 전체 최초 실행 시 모든 컨테이너 시작
+            if [ ! -f .docker_initialized ]; then
+              echo "[INFO] 초기 실행: 전체 서비스 실행"
+              docker-compose up -d --build
+              touch .docker_initialized
+            else
+              echo "[INFO] FastAPI만 재배포"
+              docker-compose up -d --build fastapi
+            fi
