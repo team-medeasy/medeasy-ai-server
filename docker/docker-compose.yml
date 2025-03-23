@@ -30,6 +30,13 @@ services:
       interval: 10s
       retries: 10
       timeout: 15s
+    command: >
+      bash -c "
+        if [ ! -d /usr/share/elasticsearch/plugins/analysis-nori ]; then
+          elasticsearch-plugin install analysis-nori --batch;
+        fi &&
+        /usr/local/bin/docker-entrypoint.sh elasticsearch
+      "
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.6.2
