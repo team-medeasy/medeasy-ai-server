@@ -19,6 +19,43 @@ INDEX_NAME = "pills"
 
 # Elasticsearch 인덱스 매핑 (dense_vector 필드 등 포함)
 INDEX_MAPPING = {
+    "settings": {
+        "analysis": {
+            "char_filter": {
+                "remove_pipe": {
+                    "type": "pattern_replace",
+                    "pattern": "\\|",
+                    "replacement": ""
+                }
+            },
+            "tokenizer": {
+                "korean_tokenizer": {
+                    "type": "nori_tokenizer"
+                },
+                "english_ngram_tokenizer": {
+                    "type": "ngram",
+                    "min_gram": 2,
+                    "max_gram": 3,
+                    "token_chars": ["letter", "digit"]
+                }
+            },
+            "analyzer": {
+                "custom_korean_english": {
+                    "tokenizer": "standard",
+                    "filter": ["lowercase"],
+                    "char_filter": ["remove_pipe"]
+                },
+                "korean_only": {
+                    "tokenizer": "korean_tokenizer",
+                    "char_filter": ["remove_pipe"]
+                },
+                "english_ngram_analyzer": {
+                    "tokenizer": "english_ngram_tokenizer",
+                    "filter": ["lowercase"]
+                }
+            }
+        }
+    },
     "mappings": {
         "properties": {
             "embedding": {
@@ -30,30 +67,37 @@ INDEX_MAPPING = {
             "item_seq": {"type": "keyword"},
             "print_front": {
                 "type": "text",
+                "analyzer": "custom_korean_english",
                 "fields": {
-                    "keyword": {"type": "keyword"},
-                    "english": {"type": "text", "analyzer": "english"}
+                    "keyword": {"type": "keyword"}
                 }
             },
             "print_back": {
                 "type": "text",
+                "analyzer": "custom_korean_english",
                 "fields": {
-                    "keyword": {"type": "keyword"},
-                    "english": {"type": "text", "analyzer": "english"}
+                    "keyword": {"type": "keyword"}
                 }
+            },
+            "print_front_normalized": {
+                "type": "text",
+                "analyzer": "english_ngram_analyzer"
+            },
+            "print_back_normalized": {
+                "type": "text",
+                "analyzer": "english_ngram_analyzer"
             },
             "drug_shape": {"type": "keyword"},
             "color_classes": {"type": "keyword"},
             "shape_group": {"type": "keyword"},
             "color_group": {"type": "keyword"},
-            "mark_code_front_anal": {"type": "text"},
-            "mark_code_back_anal": {"type": "text"}
-        }
-    },
-    "settings": {
-        "analysis": {
-            "analyzer": {
-                "english": {"type": "english"}
+            "mark_code_front_anal": {
+                "type": "text",
+                "analyzer": "custom_korean_english"
+            },
+            "mark_code_back_anal": {
+                "type": "text",
+                "analyzer": "custom_korean_english"
             }
         }
     }
