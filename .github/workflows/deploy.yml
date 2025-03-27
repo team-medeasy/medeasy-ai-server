@@ -45,5 +45,5 @@ jobs:
             # Google 인증 JSON 복원
             echo "${{ secrets.GOOGLE_CONFIG_JSON_BASE64 }}" | base64 --decode > gemini_config.json
 
-            echo "[INFO] FastAPI 서비스 재빌드 및 재시작"
-            docker-compose -f docker/docker-compose.yml --env-file .env up -d --build fastapi
+            echo "[INFO] 전체 서비스 재빌드 및 재시작"
+            docker-compose -f docker/docker-compose.yml --env-file .env up -d --build
