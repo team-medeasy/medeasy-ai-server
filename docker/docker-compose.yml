@@ -37,8 +37,6 @@ services:
     environment:
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT}
-      - ELASTICSEARCH_USERNAME=${ELASTIC_USER}
-      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
 
   fastapi:
     build:
@@ -59,5 +57,4 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
 
 volumes:
-  mongo_data:
   elastic_data:
