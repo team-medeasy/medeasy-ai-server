@@ -33,11 +33,8 @@ jobs:
             cd /home/${{ secrets.GCP_USERNAME }}/medeasy
 
             # .env 파일 생성 (docker 디렉토리 안에 생성)
-            echo "MONGO_INITDB_ROOT_USERNAME=${{ secrets.MONGO_INITDB_ROOT_USERNAME }}" > docker/.env
-            echo "MONGO_INITDB_ROOT_PASSWORD=${{ secrets.MONGO_INITDB_ROOT_PASSWORD }}" >> docker/.env
-            echo "MONGO_HOST=${{ secrets.MONGO_HOST }}" >> docker/.env
-            echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> docker/.env
-            echo "MONGO_INITDB_DATABASE=${{ secrets.MONGO_INITDB_DATABASE }}" >> docker/.env
+            echo "ELASTICSEARCH_USER=${{ secrets.ELASTICSEARCH_USER }}" > docker/.env
+            echo "ELASTICSEARCH_PASSWORD=${{ secrets.ELASTICSEARCH_PASSWORD }}" >> docker/.env
             echo "ELASTICSEARCH_HOST=${{ secrets.ELASTICSEARCH_HOST }}" >> docker/.env
             echo "ELASTICSEARCH_PORT=${{ secrets.ELASTICSEARCH_PORT }}" >> docker/.env
             echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}" >> docker/.env
