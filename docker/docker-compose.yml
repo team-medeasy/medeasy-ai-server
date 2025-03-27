@@ -51,9 +51,9 @@ services:
       elasticsearch:
         condition: service_healthy
     env_file:
-      - .env
+      - ../.env
     volumes:
-      - ./gemini_config.json:/gemini_config.json:ro
+      - ../gemini_config.json:/gemini_config.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
 
