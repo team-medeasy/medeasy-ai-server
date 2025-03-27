@@ -8,6 +8,7 @@ aiofiles>=23.1.0
 python-multipart>=0.0.6
 httpx>=0.24.0
 numpy>=1.24.3
+aiohttp>=3.8.0
 
 # Google Cloud Vertex AI
 google-cloud-aiplatform>=1.36.0
