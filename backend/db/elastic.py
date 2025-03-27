@@ -9,11 +9,16 @@ logger = logging.getLogger(__name__)
 # 환경변수에서 Elasticsearch 연결 정보 읽기
 ELASTICSEARCH_HOST = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
 ELASTICSEARCH_PORT = os.getenv("ELASTICSEARCH_PORT", "9200")
-
 ELASTICSEARCH_URL = f"http://{ELASTICSEARCH_HOST}:{ELASTICSEARCH_PORT}"
 
+ELASTIC_USER = os.getenv("ELASTIC_USER", "elastic")
+ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD", "your_password")
+
 # AsyncElasticsearch 클라이언트 생성
-es = AsyncElasticsearch([ELASTICSEARCH_URL])
+es = AsyncElasticsearch(
+    [ELASTICSEARCH_URL],
+    basic_auth=(ELASTIC_USER, ELASTIC_PASSWORD)
+)
 
 INDEX_NAME = "pills"
 
