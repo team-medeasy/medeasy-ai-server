@@ -19,6 +19,7 @@ es = AsyncElasticsearch(
     [ELASTICSEARCH_URL],
     basic_auth=(ELASTIC_USER, ELASTIC_PASSWORD)
 )
+logger.warning(f"ES 연결 확인: {ELASTICSEARCH_URL} / USER: {ELASTIC_USER}")
 
 INDEX_NAME = "pills"
 

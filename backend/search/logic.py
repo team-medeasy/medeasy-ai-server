@@ -18,6 +18,7 @@ async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[st
 
         norm_features = preprocess_features(features)
         query_body = build_es_query(norm_features, top_k)
+        logger.warning(f"QUERY BODY:\n{json.dumps(query_body, indent=2, ensure_ascii=False)}")
         response = await es.search(index=INDEX_NAME, body=query_body)
         return response["hits"]["hits"]
     except json.JSONDecodeError:
