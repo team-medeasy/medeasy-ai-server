@@ -33,8 +33,8 @@ jobs:
             cd /home/${{ secrets.GCP_USERNAME }}/medeasy
 
             # .env 파일 생성 (docker 디렉토리 안에 생성)
-            echo "ELASTIC_USER=${{ secrets.ELASTICSEARCH_USER }}" > docker/.env
-            echo "ELASTIC_PASSWORD=${{ secrets.ELASTICSEARCH_PASSWORD }}" >> docker/.env
+            echo "ELASTIC_USER=${{ secrets.ELASTIC_USER }}" > docker/.env
+            echo "ELASTIC_PASSWORD=${{ secrets.ELASTIC_PASSWORD }}" >> docker/.env
             echo "ELASTICSEARCH_HOST=${{ secrets.ELASTICSEARCH_HOST }}" >> docker/.env
             echo "ELASTICSEARCH_PORT=${{ secrets.ELASTICSEARCH_PORT }}" >> docker/.env
             echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}" >> docker/.env
