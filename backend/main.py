@@ -2,14 +2,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from backend.api.routes import pill, upload, search
-from backend.db.mongodb import connect_mongo
+
+from backend.api.routes import medicine
 from backend.db.elastic import setup_elasticsearch
 
 app = FastAPI(
     title="MedEasy Vision Pill API",
     description="의약품 이미지 분석 및 검색 API",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 # CORS 설정 (필요에 따라 변경)
@@ -22,9 +22,7 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(pill.router, prefix="/api/v1")
-app.include_router(upload.router, prefix="/api/v1")
-app.include_router(search.router, prefix="/api/v1")
+app.include_router(medicine.router, prefix="/api/v1")
 
 logger = logging.getLogger("MedEasyAPI")
 
