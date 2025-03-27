@@ -2,7 +2,6 @@
 import json
 from typing import Dict, Any, List
 import logging
-from elasticsearch import AsyncElasticsearch
 
 from backend.utils.helpers import normalize_color, get_color_group, normalize_shape, get_shape_group
 from backend.search.transform import generate_character_variations
