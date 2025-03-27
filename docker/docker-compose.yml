@@ -15,7 +15,7 @@ services:
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD", "curl", "-u", "${ELASTIC_USER}:${ELASTIC_PASSWORD}", "-f", "http://localhost:9200/_cluster/health"]
+      test: ["CMD-SHELL", "curl -u $ELASTIC_USER:$ELASTIC_PASSWORD -f http://localhost:9200/_cluster/health"]
       interval: 10s
       retries: 10
       timeout: 15s
