@@ -10,10 +10,11 @@ from backend.search.logic import search_pills
 # 이미지 분석을 위한 Gemini 서비스
 from backend.services.gemini_service import analyze_pill_image
 
-router = APIRouter(prefix="/search", tags=["Search"])
-logger = logging.getLogger("SearchAPI")
+router = APIRouter(prefix="/medicine", tags=["Medicine"])
+logger = logging.getLogger("MedicineVisonAPI")
 
-@router.get("/text", response_model=dict)
+# 이미지 기반 검색 결과가 영 이상한 약만 가져올 때, 확실하게 사용자가 입력해서 검색할 수 있게 하기 위함...
+@router.get("/text", response_model=dict) 
 async def search_by_text(
     imprint: Optional[str] = Query(None, description="약품 인쇄 문자 또는 마크 코드"),
     drug_shape: Optional[str] = Query(None, description="약품 모양"),
