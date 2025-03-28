@@ -7,19 +7,20 @@ import logging
 from contextlib import asynccontextmanager
 
 from backend.api.routes import medicine
-from backend.db.elastic import setup_elasticsearch, es
+from backend.db.elastic import check_elasticsearch_connection, es
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 초기화 작업
     logger.info("Application startup: Initializing Elasticsearch connection...")
-    es_ok = await setup_elasticsearch()
+    es_ok = await check_elasticsearch_connection()
     if not es_ok:
         logger.error("Failed to initialize Elasticsearch connection.")
     logger.info("Elasticsearch connection initialized successfully.")
     yield
     # 앱 종료 시 정리 작업
     logger.info("Application shutdown: Closing Elasticsearch connection...")
+    await es.close()
 
 app = FastAPI(
     title="MedEasy Vision Pill API",
