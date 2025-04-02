@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - prod
+  workflow-dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
