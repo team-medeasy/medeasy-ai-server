@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - prod
-  workflow-dispatch:
+  workflow_dispatch:
+
 
 permissions:
   id-token: write
