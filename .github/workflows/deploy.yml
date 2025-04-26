@@ -2,9 +2,10 @@
 name: Deploy to GCP
 
 on:
-  push:
-    branches:
-      - prod
+#  push:
+#    branches:
+#      - prod
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -33,24 +34,17 @@ jobs:
             cd /home/${{ secrets.GCP_USERNAME }}/medeasy
 
             # .env 파일 생성 (docker 디렉토리 안에 생성)
-            echo "ELASTIC_USER=${{ secrets.ELASTIC_USER }}" > docker/.env
-            echo "ELASTIC_PASSWORD=${{ secrets.ELASTIC_PASSWORD }}" >> docker/.env
-            echo "ELASTICSEARCH_HOST=${{ secrets.ELASTICSEARCH_HOST }}" >> docker/.env
-            echo "ELASTICSEARCH_PORT=${{ secrets.ELASTICSEARCH_PORT }}" >> docker/.env
-            echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}" >> docker/.env
-            echo "GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json" >> docker/.env
+            echo "ELASTIC_USER=${{ secrets.ELASTIC_USER }}" > .env
+            echo "ELASTIC_PASSWORD=${{ secrets.ELASTIC_PASSWORD }}" >> .env
+            echo "ELASTICSEARCH_HOST=${{ secrets.ELASTICSEARCH_HOST }}" >> .env
+            echo "ELASTICSEARCH_PORT=${{ secrets.ELASTICSEARCH_PORT }}" >> .env
+            echo "KIBANA_USER=${{ secrets.KIBANA_USER }}" >> .env
+            echo "KIBANA_PASSWORD=${{ secrets.KIBANA_PASSWORD }}" >> .env
+            echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}" >> .env
+            echo "GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json" >> .env
 
             # Google 인증 JSON 복원
-            echo "${{ secrets.GOOGLE_CONFIG_JSON_BASE64 }}" | base64 --decode > docker/gemini_config.json
+            echo "${{ secrets.GOOGLE_CONFIG_JSON_BASE64 }}" | base64 --decode > gemini_config.json
 
-            # 초기 실행 여부 판단
-            INITIALIZED_FILE="./docker/.docker_initialized"
-
-            if [ ! -f "$INITIALIZED_FILE" ]; then
-              echo "[INFO] 초기 실행: 전체 서비스 실행"
-              docker-compose -f docker/docker-compose.yml --env-file docker/.env up -d --build
-              touch "$INITIALIZED_FILE"
-            else
-              echo "[INFO] FastAPI만 재배포"
-              docker-compose -f docker/docker-compose.yml --env-file docker/.env up -d --build fastapi
-            fi
+            echo "[INFO] 전체 서비스 재빌드 및 재시작"
+            docker-compose -f docker/docker-compose.yml --env-file .env up -d --build

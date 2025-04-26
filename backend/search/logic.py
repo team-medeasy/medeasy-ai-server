@@ -2,7 +2,6 @@
 import json
 from typing import Dict, Any, List
 import logging
-from elasticsearch import AsyncElasticsearch
 
 from backend.utils.helpers import normalize_color, get_color_group, normalize_shape, get_shape_group
 from backend.search.transform import generate_character_variations
@@ -19,6 +18,7 @@ async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[st
 
         norm_features = preprocess_features(features)
         query_body = build_es_query(norm_features, top_k)
+        logger.warning(f"QUERY BODY:\n{json.dumps(query_body, indent=2, ensure_ascii=False)}")
         response = await es.search(index=INDEX_NAME, body=query_body)
         return response["hits"]["hits"]
     except json.JSONDecodeError:

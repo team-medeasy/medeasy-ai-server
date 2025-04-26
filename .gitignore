@@ -1,0 +1,10 @@
+.idea
+
+gemini_config.json
+.env
+
+__pycache__/
+*.pyc
+*.pyo
+
+.DS_Store

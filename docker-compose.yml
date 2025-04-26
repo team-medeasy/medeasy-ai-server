@@ -15,7 +15,7 @@ services:
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD", "curl", "-u", "${ELASTIC_USER}:${ELASTIC_PASSWORD}", "-f", "http://localhost:9200/_cluster/health"]
+      test: ["CMD-SHELL", "curl -u $ELASTIC_USER:$ELASTIC_PASSWORD -f http://localhost:9200/_cluster/health"]
       interval: 10s
       retries: 10
       timeout: 15s
@@ -34,11 +34,15 @@ services:
       - "5601:5601"
     depends_on:
       - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=${KIBANA_USER}
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
 
   fastapi:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: ./Dockerfile
     container_name: fastapi-app
     restart: always
     ports:
@@ -47,12 +51,11 @@ services:
       elasticsearch:
         condition: service_healthy
     env_file:
-      - .env
+      - ./.env
     volumes:
       - ./gemini_config.json:/gemini_config.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/gemini_config.json
 
 volumes:
-  mongo_data:
   elastic_data:
