@@ -1,7 +1,7 @@
 fastapi>=0.110.0
 uvicorn>=0.21.0
 
-elasticsearch>=8.6.0
+elasticsearch==8.17.2
 python-dotenv>=1.0.0
 pydantic>=1.10.7
 aiofiles>=23.1.0
