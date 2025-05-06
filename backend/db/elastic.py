@@ -1,10 +1,12 @@
 import os
 import logging
 from elasticsearch import AsyncElasticsearch
+from dotenv import load_dotenv
 
 from backend.utils.helpers import normalize_color, get_color_group, normalize_shape, get_shape_group
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 # 환경변수에서 Elasticsearch 연결 정보 읽기
 ELASTICSEARCH_HOST = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
