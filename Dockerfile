@@ -1,5 +1,5 @@
 # ====== 1단계: 빌드 환경 ======
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN pip install --upgrade pip \
  && pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # ====== 2단계: 런타임 환경 ======
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
