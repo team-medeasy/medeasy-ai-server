@@ -12,6 +12,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Node.js와 npm 설치 추가
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /install /usr/local
 
 COPY . .
