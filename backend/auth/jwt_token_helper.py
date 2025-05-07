@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, HTTPException, status
+from fastapi.security import HTTPBearer
 from typing import Dict, Any, Optional
-import jwt
-from datetime import datetime, timedelta
+from datetime import datetime
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 app = FastAPI()
 security = HTTPBearer()
