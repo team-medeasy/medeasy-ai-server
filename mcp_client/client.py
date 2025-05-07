@@ -15,7 +15,7 @@ config = {
           "command": "npx",
           "args": [
             "mcp-remote",
-            "http://127.0.0.1:30003/mcp",
+            "http://medeasy-mcp-server-service:8080/mcp",
             "8080"
          ]
       }
