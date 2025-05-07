@@ -2,12 +2,19 @@
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from backend.config.middleware_config import LoggingMiddleware
 
 import logging
+logging.basicConfig(level=logging.INFO)
 from contextlib import asynccontextmanager
 
 from backend.api.routes import medicine
+from mcp_client.mcp_router import router as mcp_router
+from custom_mcp_client.mcp_router import router as custom_mcp_router
+
 from backend.db.elastic import check_elasticsearch_connection, es
+from backend.config.logging_config import setup_logging
+from backend.exceptionhandler.api_exception_handler import register_exception_handler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,11 +45,16 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+register_exception_handler(app)
 # 라우터 등록
 app.include_router(medicine.router, prefix="/v2")
+app.include_router(mcp_router, prefix="/v2")
+app.include_router(custom_mcp_router, prefix="/v2")
 
-logger = logging.getLogger("MedEasyAPI")
+setup_logging()
+logger = logging.getLogger(__name__)
 
+app.add_middleware(LoggingMiddleware)
 @app.get("/")
 async def root():
     return {"message": "Welcome to MedEasy Vision API!"}
