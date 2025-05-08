@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, Dict, Optional, List
 
@@ -12,6 +13,10 @@ import logging
 
 from mcp_use.adapters import LangChainAdapter
 
+from mcp_client.fallback_handler import generate_fallback_response
+from mcp_client.mcp_client_manager import client_manager
+from mcp_client.retry_utils import with_retry
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -20,9 +25,10 @@ config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_c
 # Create LLM
 llm = ChatOpenAI(model_name="gpt-4o-mini")
 
-# Create MCPClient with config
-mcp_client = MCPClient.from_config_file(config_path)
-adapter = LangChainAdapter()
+# 서비스 초기화
+async def initialize_service():
+    """서비스 시작 시 호출되는 초기화 함수"""
+    await client_manager.initialize()
 
 async def process_user_message(system_prompt: str, user_message: str) -> Any:
     """
@@ -36,20 +42,41 @@ async def process_user_message(system_prompt: str, user_message: str) -> Any:
         message: str: LLM 응답 메시지
     """
     # 도구 초기화
-    tools = await adapter.create_tools(mcp_client)
+    tools = await client_manager.get_tools()
 
-    # 요청에 맞는 도구 선택
-    initial_response = await _get_initial_response(user_message, tools)
-    tool_calls = _extract_tool_calls(initial_response)
+    if not tools:
+        # 도구 초기화 실패 시 대체 응답
+        logger.warning("도구 초기화 실패. 대체 응답을 생성합니다.")
+        return await generate_fallback_response(system_prompt, user_message)
 
-    # TODO 도구가 없으면 2번정도 서칭 or LLM으로 응답
-    if not tool_calls:
-        return initial_response.content
+    try:
+        # 초기 응답 생성 (재시도 로직 포함)
+        async def _get_initial():
+            return await _get_initial_response(user_message, tools)
 
-    tool_results = await _execute_tool_calls(tool_calls, tools) # 도구 호출
-    response_message:str = await _generate_final_response(system_prompt, user_message, tool_calls, tool_results) # 최종 응답 생성
+        initial_response = await with_retry(_get_initial)
+        tool_calls = _extract_tool_calls(initial_response)
 
-    return response_message
+        # 도구 호출이 없으면 LLM 응답 반환
+        if not tool_calls:
+            return initial_response.content
+
+        # 도구 실행 (재시도 로직 포함)
+        async def _execute_tools():
+            return await _execute_tool_calls(tool_calls, tools)
+
+        tool_results = await with_retry(_execute_tools)
+
+        # 최종 응답 생성 (재시도 로직 포함)
+        async def _generate_final():
+            return await _generate_final_response(system_prompt, user_message, tool_calls, tool_results)
+
+        return await with_retry(_generate_final)
+
+    except Exception as e:
+        logger.exception(f"메시지 처리 중 오류 발생: {e}")
+        # 장애 발생 시 대체 응답
+        return await generate_fallback_response(system_prompt, user_message, str(e))
 
 async def _get_initial_response(
     user_message: str,
@@ -198,3 +225,6 @@ async def _generate_final_response(
     except Exception as e:
         logger.exception("Failed to generate final response: %s", e)
         return json.dumps({"tool_results": tool_results, "error": str(e)})
+
+# 서비스 시작 시 초기화 함수 호출
+asyncio.create_task(initialize_service())
