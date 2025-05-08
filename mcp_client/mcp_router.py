@@ -1,4 +1,4 @@
-from typing import Optional
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ async def process_message(request: ChatRequest):
             사용자 요청에 대해 적절한 도구를 사용하여 서비스를 제공하세요.
             응답은 한글로 주세요.
             답변을 그대로 음성으로 들려줄 것이기 때문에, 간결하게 설명하세요.  
+            현재 요청 시간: {datetime.now()}
         """
 
         user_message = f"""
