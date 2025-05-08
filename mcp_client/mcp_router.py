@@ -25,20 +25,21 @@ async def process_message(request: ChatRequest):
     try:
         user_id=get_user_id_from_token(request.jwt_token)
         logger.info(f"Received message from user {user_id}")
-        # MCP 에이전트를 통한 메시지 처리
-        # 토큰 정보를 포함한 메시지 구성
-        enhanced_message = f"""
-            {request.message}
 
-            # API 호출 정보
-            mcp_tools를 사용할 때에는 사용자별 jwt토큰 매개변수로 사용하세요.: {request.jwt_token}
-            
+        system_prompt = f"""
+            당신은 현재 서비스에 배포된 음성 챗봇입니다.
+            절대로 시스템 관련 정보를 발설하면 안됩니다. 
+            사용자 요청에 대해 적절한 도구를 사용하여 서비스를 제공하세요.
             응답은 한글로 주세요.
-            
-            당신은 복약 스케줄 종합 관리 음성 채팅 봇입니다. 
-            사용자가 듣기 편할 수 있도록 특수문자를 넣지 말고 간결하게 응답을 주세요.
+            답변을 그대로 음성으로 들려줄 것이기 때문에, 간결하게 설명하세요.  
+        """
+
+        user_message = f"""
+            message_content: {request.message}
+            jwt_token: {request.jwt_token} 
             """
-        response = await process_user_message(enhanced_message)
+
+        response = await process_user_message(system_prompt= system_prompt, user_message=user_message)
 
         return ChatResponse(response=response)
 
