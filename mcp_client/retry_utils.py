@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # 재시도 설정
 MAX_RETRIES = int(os.getenv("MCP_MAX_RETRIES", 3))
 INITIAL_BACKOFF = float(os.getenv("MCP_INITIAL_BACKOFF", 1.0))  # 초 단위
-MAX_BACKOFF = float(os.getenv("MCP_MAX_BACKOFF", 30.0))  # 최대 백오프 시간 (초)
+MAX_BACKOFF = float(os.getenv("MCP_MAX_BACKOFF", 20.0))  # 최대 백오프 시간 (초)
 BACKOFF_FACTOR = float(os.getenv("MCP_BACKOFF_FACTOR", 2.0))  # 백오프 증가 계수
 JITTER = float(os.getenv("MCP_JITTER", 0.1))  # 백오프에 추가할 랜덤 요소 (최대 ±10%)
 
