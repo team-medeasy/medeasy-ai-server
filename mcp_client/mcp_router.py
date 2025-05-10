@@ -40,7 +40,7 @@ async def process_message(request: ChatRequest):
             jwt_token: {request.jwt_token} 
             """
 
-        response = await process_user_message(system_prompt= system_prompt, user_message=user_message)
+        response = await process_user_message(system_prompt= system_prompt, user_message=user_message, user_id=int(user_id))
 
         return ChatResponse(response=response)
 
