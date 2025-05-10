@@ -25,3 +25,7 @@ langchain-openai==0.3.16
 
 # jwt
 PyJWT==2.10.1
+starlette~=0.46.2
+protobuf~=5.29.4
+langchain-core~=0.3.58
+redis~=6.0.0
