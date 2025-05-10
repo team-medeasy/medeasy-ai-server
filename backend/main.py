@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 
 from backend.api.routes import medicine
 from mcp_client.mcp_router import router as mcp_router
-from custom_mcp_client.mcp_router import router as custom_mcp_router
 
 from backend.db.elastic import check_elasticsearch_connection, es
 from backend.config.logging_config import setup_logging
@@ -49,7 +48,6 @@ register_exception_handler(app)
 # 라우터 등록
 app.include_router(medicine.router, prefix="/v2")
 app.include_router(mcp_router, prefix="/v2")
-app.include_router(custom_mcp_router, prefix="/v2")
 
 setup_logging()
 logger = logging.getLogger(__name__)

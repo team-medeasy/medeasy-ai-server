@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Any
 
 from langchain_openai import ChatOpenAI
 
@@ -12,7 +12,7 @@ llm = ChatOpenAI(model_name="gpt-4o-mini")
 async def generate_fallback_response(
         system_prompt: str,
         user_message: str,
-        error: Optional[str] = None
+        chat_history: str
 ) -> str:
     """
     도구 장애 시 사용되는 대체 응답 생성
@@ -26,11 +26,11 @@ async def generate_fallback_response(
         str: 대체 응답 메시지
     """
     fallback_prompt = f"""
-{system_prompt}
+시스템 명령: {system_prompt}
+이전 채팅 내역: {chat_history}
 
 중요: 현재 의약품 정보 시스템에 일시적인 연결 문제가 발생했습니다. 
-사용자의 질문에 최선을 다해 응답해주세요. 하지만 약물 정보나 복용 관련 데이터는 제공할 수 없습니다.
-사용자에게 시스템 장애가 발생했음을 알리고, 잠시 후 다시 시도해달라고 안내해주세요.
+사용자의 질문에 최선을 다해 응답해주세요. 필요한 경우 과거 채팅 내역을 활용하여 답변하세요.
 """
 
     try:

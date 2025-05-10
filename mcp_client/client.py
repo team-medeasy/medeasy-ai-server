@@ -4,18 +4,17 @@ from typing import Any, Dict, Optional, List
 
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import Tool
-from mcp_use import MCPClient, MCPAgent
 from langchain_openai import ChatOpenAI
 import os
 
 from dotenv import load_dotenv
 import logging
 
-from mcp_use.adapters import LangChainAdapter
 
 from mcp_client.fallback_handler import generate_fallback_response
 from mcp_client.mcp_client_manager import client_manager
 from mcp_client.retry_utils import with_retry
+from mcp_client.chat_session_repo import chat_session_repo
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -30,36 +29,46 @@ async def initialize_service():
     """서비스 시작 시 호출되는 초기화 함수"""
     await client_manager.initialize()
 
-async def process_user_message(system_prompt: str, user_message: str) -> Any:
+async def process_user_message(system_prompt: str, user_message: str, user_id: int) -> Any:
     """
     사용자의 메시지에 대해 도구를 사용하여 요청 처리
 
     Args:
         system_prompt (str): 시스템 프롬프트
         user_message (str): 사용자가 입력한 메시지 내용.
+        user_id (int): 사용자 식별자
 
     Returns:
         message: str: LLM 응답 메시지
     """
+    # 채팅 이력을 가져와 컨텍스트에 포함
+    recent_messages = chat_session_repo.get_recent_messages(user_id, 10)
+    chat_history: str = format_chat_history(recent_messages)
+
     # 도구 초기화
     tools = await client_manager.get_tools()
 
     if not tools:
         # 도구 초기화 실패 시 대체 응답
-        logger.warning("도구 초기화 실패. 대체 응답을 생성합니다.")
-        return await generate_fallback_response(system_prompt, user_message)
+        logger.warning("메시지에 맞는 도구가 존재하지 않음. 대체 응답을 생성합니다.")
+        fallback_response = await generate_fallback_response(system_prompt, user_message, chat_history)
+
+        chat_session_repo.add_message(user_id=user_id, role="system", message=fallback_response)
+        return fallback_response
 
     try:
         # 초기 응답 생성 (재시도 로직 포함)
         async def _get_initial():
-            return await _get_initial_response(user_message, tools)
+            return await _get_initial_response(user_message, tools, chat_history)
 
         initial_response = await with_retry(_get_initial)
         tool_calls = _extract_tool_calls(initial_response)
 
         # 도구 호출이 없으면 LLM 응답 반환
         if not tool_calls:
-            return initial_response.content
+            response = initial_response.content
+            chat_session_repo.add_message(user_id, "system", response)
+            return response
 
         # 도구 실행 (재시도 로직 포함)
         async def _execute_tools():
@@ -71,29 +80,51 @@ async def process_user_message(system_prompt: str, user_message: str) -> Any:
         async def _generate_final():
             return await _generate_final_response(system_prompt, user_message, tool_calls, tool_results)
 
-        return await with_retry(_generate_final)
+        final_response = await with_retry(_generate_final)
+
+        # 사용자 응답 저장
+        chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
+
+        # 시스템 응답 저장
+        chat_session_repo.add_message(user_id, "system", final_response)
+        return final_response
 
     except Exception as e:
         logger.exception(f"메시지 처리 중 오류 발생: {e}")
         # 장애 발생 시 대체 응답
-        return await generate_fallback_response(system_prompt, user_message, str(e))
+        fallback_response = await generate_fallback_response(system_prompt, user_message, str(e))
+
+        chat_session_repo.add_message(user_id, "system", fallback_response)
+        return fallback_response
 
 async def _get_initial_response(
     user_message: str,
-    tools: List[Tool]
+    tools: List[Tool],
+    chat_history: Optional[str] = None,
 ) -> BaseMessage:
     """
-    주어진 사용자의 메시지와 어울리는 도구 리스트 추출
+    주어진 사용자의 메시지와 이전 채팅 이력을 바탕으로 도구 리스트 추출
 
     Args:
         user_message (str): 사용자가 입력한 메시지 내용.
         tools (List[Tool]): LLM 에이전트에 바인딩할 도구들의 리스트.
+        chat_history (Optional[str]): 이전 대화 내역 (포맷팅된 문자열)
 
     Returns:
         BaseMessage: 도구 호출 정보를 포함할 수 있는 초기 LLM 응답 객체
     """
     llm_with_tools = llm.bind_tools(tools)
-    response: BaseMessage = await llm_with_tools.ainvoke(user_message)
+    # 채팅 이력이 있는 경우 프롬프트에 포함
+
+    if chat_history:
+        # 채팅 이력과 현재 메시지를 결합
+        full_prompt = f"이전의 시스템과 사용자 채팅 내역: {chat_history}\n\n 사용자의 새로운 메시지: {user_message}"
+        logger.info(f"full_prompt: {full_prompt}")
+        response: BaseMessage = await llm_with_tools.ainvoke(full_prompt)
+    else:
+        # 채팅 이력이 없으면 사용자 메시지만 사용
+        response: BaseMessage = await llm_with_tools.ainvoke(user_message)
+
     logger.info("Initial response received")
     return response
 
@@ -225,6 +256,23 @@ async def _generate_final_response(
     except Exception as e:
         logger.exception("Failed to generate final response: %s", e)
         return json.dumps({"tool_results": tool_results, "error": str(e)})
+
+
+# 채팅 이력을 포맷팅하는 함수
+def format_chat_history(messages: List[Dict]) -> str:
+    """채팅 이력을 프롬프트에 포함하기 위한 포맷팅"""
+    formatted = "이전 대화 내역:\n"
+
+    for msg in messages:
+        # 시간 포맷팅
+        from datetime import datetime
+        role = msg.get("role", "")
+        timestamp = datetime.fromtimestamp(msg['timestamp'])
+        time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+        formatted += f"[{time_str}] {role}: {msg['message']}\n"
+
+    return formatted
 
 # 서비스 시작 시 초기화 함수 호출
 asyncio.create_task(initialize_service())
