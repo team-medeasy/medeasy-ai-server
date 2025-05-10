@@ -16,6 +16,10 @@ from mcp_client.mcp_client_manager import client_manager
 from mcp_client.retry_utils import with_retry
 from mcp_client.chat_session_repo import chat_session_repo
 
+import time
+import random
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -23,6 +27,18 @@ config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_c
 
 # Create LLM
 llm = ChatOpenAI(model_name="gpt-4o-mini")
+
+# SSE 연결 오류를 위한 재시도 데코레이터
+@retry(
+    retry=retry_if_exception_type(Exception),  # SSE 오류 클래스로 변경 가능
+    stop=stop_after_attempt(5),  # 최대 5회 재시도
+    wait=wait_exponential(multiplier=1, min=1, max=10),  # 지수 백오프
+    before_sleep=lambda retry_state: print(f"연결 재시도 중... ({retry_state.attempt_number}/5)")
+)
+async def get_tools_with_retry():
+    # 랜덤 지연을 추가해 동시 연결 문제 완화
+    await asyncio.sleep(random.uniform(0.5, 2.0))
+    return await client_manager.get_tools()
 
 # 서비스 초기화
 async def initialize_service():
@@ -46,8 +62,10 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
     chat_history: str = format_chat_history(recent_messages)
 
     # 도구 초기화
-    tools = await client_manager.get_tools()
+    # tools = await client_manager.get_tools()
+    tools = await get_tools_with_retry()
 
+    # TODO 거의 호출되지 않는 코드
     if not tools:
         # 도구 초기화 실패 시 대체 응답
         logger.warning("메시지에 맞는 도구가 존재하지 않음. 대체 응답을 생성합니다.")

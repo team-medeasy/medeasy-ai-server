@@ -7,7 +7,7 @@ load_dotenv()
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
-REDIS_MAX_MESSAGES = os.getenv("REDIS_MAX_MESSAGES")
+REDIS_MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", 10))
 
 chat_session_repo = ChatSessionRepository(
     host=REDIS_HOST,

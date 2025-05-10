@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatSessionRepository:
-    def __init__(self, host, port, password, max_messages=10):
+    def __init__(self, host, port, password, max_messages: int=10):
         """
         Redis 채팅 세션 레포지토리 초기화
 
@@ -33,6 +33,7 @@ class ChatSessionRepository:
         return f"chat:session:{user_id}"
 
     def add_message(self, user_id: int, role: str, message: str) -> bool:
+        logger.info(f"✅✅✅✅✅ 채팅 저장 내용 {message}")
         """
         채팅 세션에 새 메시지 추가 (최신 메시지가 먼저 오도록)
 
