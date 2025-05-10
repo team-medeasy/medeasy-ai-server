@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 # 요청 모델 정의
 class ChatRequest(BaseModel):
     message: str
-    jwt_token: str
 
 # 응답 모델 정의
 class ChatResponse(BaseModel):
@@ -21,9 +20,20 @@ class ChatResponse(BaseModel):
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 @router.post("/message", response_model=ChatResponse)
-async def process_message(request: ChatRequest):
+async def process_message(
+        request: ChatRequest,
+        authorization: str = Header(None)  # Authorization 헤더에서 토큰 가져오기
+):
     try:
-        user_id=get_user_id_from_token(request.jwt_token)
+        # 헤더에서 토큰 처리 (Bearer 토큰 형식 처리)
+        token = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.replace("Bearer ", "")
+
+        if token is None:
+            raise HTTPException(status_code=403, detail=f"Invalid Format Authorization Token")
+
+        user_id=get_user_id_from_token(token)
         logger.info(f"Received message from user {user_id}")
 
         system_prompt = f"""
@@ -37,7 +47,7 @@ async def process_message(request: ChatRequest):
 
         user_message = f"""
             message_content: {request.message}
-            jwt_token: {request.jwt_token} 
+            jwt_token: {token} 
             """
 
         response = await process_user_message(system_prompt= system_prompt, user_message=user_message, user_id=int(user_id))

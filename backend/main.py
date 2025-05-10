@@ -14,6 +14,7 @@ from mcp_client.mcp_router import router as mcp_router
 from backend.db.elastic import check_elasticsearch_connection, es
 from backend.config.logging_config import setup_logging
 from backend.exceptionhandler.api_exception_handler import register_exception_handler
+from backend.config.swagger_config import setup_swagger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,10 +30,15 @@ async def lifespan(app: FastAPI):
     await es.close()
 
 app = FastAPI(
-    title="MedEasy Vision Pill API",
-    description="의약품 이미지 분석 및 검색 API",
-    version="1.1.0",
     lifespan=lifespan
+)
+
+# Swagger UI 설정
+app = setup_swagger(
+    app,
+    title="MedEasy Vision Pill API",
+    version="1.1.0",
+    description="의약품 이미지 분석 및 검색 API"
 )
 
 # CORS 설정 (필요에 따라 변경)
@@ -44,6 +50,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+
 register_exception_handler(app)
 # 라우터 등록
 app.include_router(medicine.router, prefix="/v2")
@@ -53,6 +60,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 app.add_middleware(LoggingMiddleware)
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to MedEasy Vision API!"}
