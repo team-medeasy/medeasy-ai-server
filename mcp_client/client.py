@@ -16,9 +16,10 @@ from mcp_client.mcp_client_manager import client_manager
 from mcp_client.retry_utils import with_retry
 from mcp_client.chat_session_repo import chat_session_repo
 
-import time
 import random
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from mcp_client.tool_manager import tool_manager
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -63,9 +64,9 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
     chat_history: str = format_chat_history(recent_messages)
     logger.info("채팅 이력 조회 끝")
 
-    logger.info("도구 초기화")
     # 도구 초기화
-    tools = await get_tools_with_retry()
+    logger.info("도구 초기화")
+    tools = await tool_manager.get_tools()
     logger.info("도구 초기화 완료")
 
     if not tools:
@@ -146,7 +147,6 @@ async def _get_initial_response(
     if chat_history:
         # 채팅 이력과 현재 메시지를 결합
         full_prompt = f"이전의 시스템과 사용자 채팅 내역: {chat_history}\n\n 사용자의 새로운 메시지: {user_message}"
-        logger.info(f"full_prompt: {full_prompt}")
         response: BaseMessage = await llm_with_tools.ainvoke(full_prompt)
     else:
         # 채팅 이력이 없으면 사용자 메시지만 사용
@@ -300,6 +300,3 @@ def format_chat_history(messages: List[Dict]) -> str:
         formatted += f"[{time_str}] {role}: {msg['message']}\n"
 
     return formatted
-
-# 서비스 시작 시 초기화 함수 호출
-asyncio.create_task(initialize_service())

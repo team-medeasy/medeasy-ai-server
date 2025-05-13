@@ -1,10 +1,11 @@
 import logging
 from typing import Optional, Any
-
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
+load_dotenv()
 # LLM 초기화
 llm = ChatOpenAI(model_name="gpt-4o-mini")
 
