@@ -5,6 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config.middleware_config import LoggingMiddleware
 
 import logging
+
+from mcp_client import initialize_service
+from mcp_client.tool_manager import tool_manager
+
 logging.basicConfig(level=logging.INFO)
 from contextlib import asynccontextmanager
 
@@ -24,6 +28,13 @@ async def lifespan(app: FastAPI):
     if not es_ok:
         logger.error("Failed to initialize Elasticsearch connection.")
     logger.info("Elasticsearch connection initialized successfully.")
+
+    logger.info("MCP client 초기화 시작")
+    await initialize_service()
+    logger.info("MCP client 초기화 완료")
+    await tool_manager.initialize()
+    logger.info("MCP Server's Tools Uploading Completed")
+
     yield
     # 앱 종료 시 정리 작업
     logger.info("Application shutdown: Closing Elasticsearch connection...")
