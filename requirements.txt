@@ -13,6 +13,7 @@ aiohttp>=3.8.0
 
 # Google Cloud Vertex AI
 google-cloud-aiplatform>=1.36.0
+google-cloud-texttospeech==2.27.0
 vertexai>=0.0.1
 pillow>=10.0.0
 
