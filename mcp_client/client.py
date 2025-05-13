@@ -58,17 +58,19 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
         message: str: LLM 응답 메시지
     """
     # 채팅 이력을 가져와 컨텍스트에 포함
+    logger.info("채팅 이력 조회")
     recent_messages = chat_session_repo.get_recent_messages(user_id, 10)
     chat_history: str = format_chat_history(recent_messages)
+    logger.info("채팅 이력 조회 끝")
 
+    logger.info("도구 초기화")
     # 도구 초기화
-    # tools = await client_manager.get_tools()
     tools = await get_tools_with_retry()
+    logger.info("도구 초기화 완료")
 
-    # TODO 거의 호출되지 않는 코드
     if not tools:
         # 도구 초기화 실패 시 대체 응답
-        logger.warning("메시지에 맞는 도구가 존재하지 않음. 대체 응답을 생성합니다.")
+        logger.warning("mcp server 도구 로딩 에러")
         fallback_response = await generate_fallback_response(system_prompt, user_message, chat_history)
 
         chat_session_repo.add_message(user_id=user_id, role="system", message=fallback_response)
@@ -79,8 +81,10 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
         async def _get_initial():
             return await _get_initial_response(user_message, tools, chat_history)
 
+        logger.info("메시지와 어울리는 도구 호출")
         initial_response = await with_retry(_get_initial)
         tool_calls = _extract_tool_calls(initial_response)
+        logger.info("메시지와 어울리는 도구 호출 완료")
 
         # 도구 호출이 없으면 LLM 응답 반환
         if not tool_calls:
@@ -91,20 +95,25 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
         # 도구 실행 (재시도 로직 포함)
         async def _execute_tools():
             return await _execute_tool_calls(tool_calls, tools)
-
+        logger.info("도구 실행")
         tool_results = await with_retry(_execute_tools)
+        logger.info("도구 실행 완료")
 
         # 최종 응답 생성 (재시도 로직 포함)
         async def _generate_final():
             return await _generate_final_response(system_prompt, user_message, tool_calls, tool_results)
 
+        logger.info("최종 응답 생성")
         final_response = await with_retry(_generate_final)
+        logger.info("최종 응답 생성 완료")
 
+        logger.info("대화 내용 저장")
         # 사용자 응답 저장
         chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
 
         # 시스템 응답 저장
         chat_session_repo.add_message(user_id, "system", final_response)
+        logger.info("대화 내용 저장완료")
         return final_response
 
     except Exception as e:
@@ -197,7 +206,7 @@ async def _execute_tool_calls(
         try:
             raw = await tool.ainvoke(args) # 도구 호출
             content = raw if isinstance(raw, str) else json.dumps(raw) # raw가 str이면 -> raw 아니면 json.dumps(raw)
-            logger.info("Tool %s result: %s", name, content) # 도구 호출 결과
+            # logger.info("Tool %s result: %s", name, content) # 도구 호출 결과
             results.append(_make_result(tool_id, name, content))
         except Exception as e:
             error = f"Error executing {name}: {e}"
