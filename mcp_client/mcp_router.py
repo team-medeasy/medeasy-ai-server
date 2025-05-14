@@ -6,6 +6,7 @@ from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.tts import convert_text_to_speech
 import logging
+from mcp_client.medeasy_agent import process_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ async def process_message_voice(
             jwt_token: {token} 
             """
 
+        # response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
         response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
         mp3_response = await convert_text_to_speech(response)
 
