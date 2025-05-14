@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import Tool
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_client.json")
 
 # Create LLM
+# llm = ChatOpenAI(model_name="gpt-3.5-turbo-16k")
 llm = ChatOpenAI(model_name="gpt-4o-mini")
 
 # SSE 연결 오류를 위한 재시도 데코레이터
@@ -47,7 +48,7 @@ async def initialize_service():
     """서비스 시작 시 호출되는 초기화 함수"""
     await client_manager.initialize()
 
-async def process_user_message(user_message: str, user_id: int) -> Any:
+async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Optional[str]]:
     """
     사용자의 메시지에 대해 도구를 사용하여 요청 처리
 
@@ -63,7 +64,7 @@ async def process_user_message(user_message: str, user_id: int) -> Any:
     logger.info("채팅 이력 조회")
     recent_messages = chat_session_repo.get_recent_messages(user_id, 10)
     chat_history: str = format_chat_history(recent_messages)
-    logger.info("채팅 이력 조회 끝")
+    logger.info(f"채팅 이력 조회 결과: {chat_history}")
 
     # 도구 초기화
     logger.info("도구 로딩")
@@ -75,8 +76,9 @@ async def process_user_message(user_message: str, user_id: int) -> Any:
         logger.warning("mcp server 도구 로딩 에러")
         fallback_response = await generate_fallback_response(system_prompt, user_message, chat_history)
 
+        chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
         chat_session_repo.add_message(user_id=user_id, role="system", message=fallback_response)
-        return fallback_response
+        return fallback_response, None
 
     try:
         # 초기 응답 생성 (재시도 로직 포함)
@@ -88,11 +90,18 @@ async def process_user_message(user_message: str, user_id: int) -> Any:
         tool_calls = _extract_tool_calls(initial_response)
         logger.info("메시지와 어울리는 도구 호출 완료")
 
-        # 도구 호출이 없으면 LLM 응답 반환
+
+        # 도구 호출 결과에 따른 분기 처리
         if not tool_calls:
             response = initial_response.content
+            chat_session_repo.add_message(user_id, "user", user_message)
             chat_session_repo.add_message(user_id, "system", response)
-            return response
+            return response, None
+
+        for tool_call in tool_calls:
+            if tool_call.get('function', {}).get('name') == 'register_routine_by_prescription':
+                return '처방전 촬영해주세요.', "CAPTURE_PRESCRIPTION"
+
 
         # 도구 실행 (재시도 로직 포함)
         async def _execute_tools():
@@ -110,13 +119,11 @@ async def process_user_message(user_message: str, user_id: int) -> Any:
         logger.info("최종 응답 생성 완료")
 
         logger.info("대화 내용 저장")
-        # 사용자 응답 저장
+        # 사용자 및 시스템 응답 저장
         chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
-
-        # 시스템 응답 저장
         chat_session_repo.add_message(user_id, "system", final_response)
         logger.info("대화 내용 저장완료")
-        return final_response
+        return final_response, None
 
     except Exception as e:
         logger.exception(f"메시지 처리 중 오류 발생: {e}")
@@ -124,7 +131,7 @@ async def process_user_message(user_message: str, user_id: int) -> Any:
         fallback_response = await generate_fallback_response(system_prompt, user_message, str(e))
 
         chat_session_repo.add_message(user_id, "system", fallback_response)
-        return fallback_response
+        return fallback_response, None
 
 async def _get_initial_response(
     user_message: str,
@@ -142,9 +149,7 @@ async def _get_initial_response(
     Returns:
         BaseMessage: 도구 호출 정보를 포함할 수 있는 초기 LLM 응답 객체
     """
-    logger.info("llm bind tools start ")
     llm_with_tools = llm.bind_tools(tools)
-    logger.info("llm bind tools end ")
     # 채팅 이력이 있는 경우 프롬프트에 포함
 
     messages = [
@@ -155,14 +160,16 @@ async def _get_initial_response(
     if chat_history and len(chat_history) > 0:
         # 채팅 이력 요약/축소하여 토큰 수 제한
         condensed_history = _condense_chat_history(chat_history)
-        messages.append({"role": "system", "content": f"이전 대화 내용: {condensed_history}"})
+        messages.append({"role": "system", "content": f"이전 대화 내용: {chat_history}"})
 
     # 사용자 메시지 추가
     messages.append({"role": "user", "content": user_message})
 
+    logger.info(f"tool selector messages: {messages}")
+
     # TODO 벡터 데이터베이스로 대체
     response: BaseMessage = await llm_with_tools.ainvoke(messages)
-    logger.info("Initial response received")
+    logger.info(f"Initial response received: {response}")
     return response
 
 def _condense_chat_history(chat_history: str) -> str:

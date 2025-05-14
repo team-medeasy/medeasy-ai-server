@@ -82,10 +82,18 @@ async def process_message_voice(
             jwt_token: {token} 
             """
 
-        response = await process_user_message(user_message=user_message, user_id=int(user_id))
+        response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
         mp3_response = await convert_text_to_speech(response)
 
-        return Response(content=mp3_response, media_type="audio/mpeg")
+        headers = {
+            "X-Action": action if action else ""
+        }
+
+        return Response(
+            content=mp3_response,
+            media_type="audio/mpeg",
+            headers=headers
+        )
 
     except Exception as e:
         # 오류 처리
