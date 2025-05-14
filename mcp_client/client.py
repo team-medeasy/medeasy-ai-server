@@ -64,7 +64,7 @@ async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Op
     logger.info("채팅 이력 조회")
     recent_messages = chat_session_repo.get_recent_messages(user_id, 10)
     chat_history: str = format_chat_history(recent_messages)
-    logger.info(f"채팅 이력 조회 결과: {chat_history}")
+    logger.info(f"채팅 이력 조회 완료")
 
     # 도구 초기화
     logger.info("도구 로딩")
@@ -104,6 +104,7 @@ async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Op
 
             if tool_call.get('function', {}).get('name') == 'register_routine_by_pills_photo':
                 return '알약 사진을 촬영해주세요.', "CAPTURE_PILLS_PHOTO"
+
 
         # 도구 실행 (재시도 로직 포함)
         async def _execute_tools():

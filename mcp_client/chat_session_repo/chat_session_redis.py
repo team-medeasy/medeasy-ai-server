@@ -69,7 +69,7 @@ class ChatSessionRepository:
             )
 
             # 3. 세션 만료 시간 설정 (선택 사항) - 30일
-            pipe.expire(self.get_session_key(user_id), 60 * 60 * 24 * 30)
+            pipe.expire(self.get_session_key(user_id), 300)
 
             # 명령 실행
             pipe.execute()
