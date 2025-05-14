@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_client.json")
 
 # Create LLM
-# llm = ChatOpenAI(model_name="gpt-3.5-turbo-16k")
-llm = ChatOpenAI(model_name="gpt-4o-mini")
+final_response_llm= ChatOpenAI(model_name="gpt-3.5-turbo-16k")
+tool_llm = ChatOpenAI(model_name="gpt-4o-mini")
 
 # SSE 연결 오류를 위한 재시도 데코레이터
 @retry(
@@ -152,7 +152,7 @@ async def _get_initial_response(
     Returns:
         BaseMessage: 도구 호출 정보를 포함할 수 있는 초기 LLM 응답 객체
     """
-    llm_with_tools = llm.bind_tools(tools)
+    llm_with_tools = tool_llm.bind_tools(tools)
     # 채팅 이력이 있는 경우 프롬프트에 포함
 
     messages = [
@@ -306,7 +306,7 @@ async def _generate_final_response(
         )
 
     try:
-        llm_response = await llm.ainvoke(messages)
+        llm_response = await final_response_llm.ainvoke(messages)
         return llm_response.content
     except Exception as e:
         logger.exception("Failed to generate final response: %s", e)
