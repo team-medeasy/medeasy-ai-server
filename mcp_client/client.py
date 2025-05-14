@@ -102,6 +102,8 @@ async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Op
             if tool_call.get('function', {}).get('name') == 'register_routine_by_prescription':
                 return '처방전 촬영해주세요.', "CAPTURE_PRESCRIPTION"
 
+            if tool_call.get('function', {}).get('name') == 'register_routine_by_pills_photo':
+                return '알약 사진을 촬영해주세요.', "CAPTURE_PILLS_PHOTO"
 
         # 도구 실행 (재시도 로직 포함)
         async def _execute_tools():
