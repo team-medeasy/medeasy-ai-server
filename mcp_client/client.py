@@ -10,16 +10,17 @@ import os
 from dotenv import load_dotenv
 import logging
 
+from mcp_client.prompt import final_response_system_prompt, tool_selector_system_prompt, system_prompt
 
 from mcp_client.fallback_handler import generate_fallback_response
 from mcp_client.mcp_client_manager import client_manager
 from mcp_client.retry_utils import with_retry
 from mcp_client.chat_session_repo import chat_session_repo
+from mcp_client.tool_manager import tool_manager
 
 import random
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from mcp_client.tool_manager import tool_manager
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ async def initialize_service():
     """서비스 시작 시 호출되는 초기화 함수"""
     await client_manager.initialize()
 
-async def process_user_message(system_prompt: str, user_message: str, user_id: int) -> Any:
+async def process_user_message(user_message: str, user_id: int) -> Any:
     """
     사용자의 메시지에 대해 도구를 사용하여 요청 처리
 
@@ -65,9 +66,9 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
     logger.info("채팅 이력 조회 끝")
 
     # 도구 초기화
-    logger.info("도구 초기화")
+    logger.info("도구 로딩")
     tools = await tool_manager.get_tools()
-    logger.info("도구 초기화 완료")
+    logger.info("도구 로딩 완료")
 
     if not tools:
         # 도구 초기화 실패 시 대체 응답
@@ -102,7 +103,7 @@ async def process_user_message(system_prompt: str, user_message: str, user_id: i
 
         # 최종 응답 생성 (재시도 로직 포함)
         async def _generate_final():
-            return await _generate_final_response(system_prompt, user_message, tool_calls, tool_results)
+            return await _generate_final_response(final_response_system_prompt, user_message, tool_calls, tool_results)
 
         logger.info("최종 응답 생성")
         final_response = await with_retry(_generate_final)
@@ -141,19 +142,37 @@ async def _get_initial_response(
     Returns:
         BaseMessage: 도구 호출 정보를 포함할 수 있는 초기 LLM 응답 객체
     """
+    logger.info("llm bind tools start ")
     llm_with_tools = llm.bind_tools(tools)
+    logger.info("llm bind tools end ")
     # 채팅 이력이 있는 경우 프롬프트에 포함
 
-    if chat_history:
-        # 채팅 이력과 현재 메시지를 결합
-        full_prompt = f"이전의 시스템과 사용자 채팅 내역: {chat_history}\n\n 사용자의 새로운 메시지: {user_message}"
-        response: BaseMessage = await llm_with_tools.ainvoke(full_prompt)
-    else:
-        # 채팅 이력이 없으면 사용자 메시지만 사용
-        response: BaseMessage = await llm_with_tools.ainvoke(user_message)
+    messages = [
+        {"role": "system", "content": tool_selector_system_prompt}
+    ]
 
+    # 채팅 이력이 있는 경우만 포함 (토큰 절약)
+    if chat_history and len(chat_history) > 0:
+        # 채팅 이력 요약/축소하여 토큰 수 제한
+        condensed_history = _condense_chat_history(chat_history)
+        messages.append({"role": "system", "content": f"이전 대화 내용: {condensed_history}"})
+
+    # 사용자 메시지 추가
+    messages.append({"role": "user", "content": user_message})
+
+    # TODO 벡터 데이터베이스로 대체
+    response: BaseMessage = await llm_with_tools.ainvoke(messages)
     logger.info("Initial response received")
     return response
+
+def _condense_chat_history(chat_history: str) -> str:
+    """채팅 이력을 요약하거나 축소하여 토큰 수를 줄임"""
+    # 실제 구현에서는 최근 N개 메시지만 유지하거나,
+    # 키워드 추출 등의 방법으로 이력을 요약할 수 있음
+    lines = chat_history.split('\n')
+    if len(lines) > 10:  # 예: 최대 10줄만 유지
+        return '\n'.join(lines[-10:])
+    return chat_history
 
 def _extract_tool_calls(response: BaseMessage) -> List[Dict[str, Any]]:
     """
@@ -278,7 +297,6 @@ async def _generate_final_response(
 
     try:
         llm_response = await llm.ainvoke(messages)
-        logger.info("Received final LLM response")
         return llm_response.content
     except Exception as e:
         logger.exception("Failed to generate final response: %s", e)

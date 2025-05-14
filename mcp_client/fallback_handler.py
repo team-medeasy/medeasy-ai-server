@@ -7,7 +7,11 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 # LLM 초기화
-llm = ChatOpenAI(model_name="gpt-4o-mini")
+llm = ChatOpenAI(
+    model_name="gpt-3.5-turbo-16k",
+    temperature=0.1,
+    request_timeout=5.0
+)
 
 
 async def generate_fallback_response(
