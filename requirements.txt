@@ -30,3 +30,5 @@ starlette~=0.46.2
 protobuf~=5.29.4
 langchain-core~=0.3.58
 redis~=6.0.0
+tenacity~=9.1.2
+langgraph~=0.4.3
