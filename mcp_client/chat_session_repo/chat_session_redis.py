@@ -68,7 +68,7 @@ class ChatSessionRepository:
                 self.max_messages - 1
             )
 
-            # 3. 세션 만료 시간 설정 (선택 사항) - 30일
+            # 3. 세션 만료 시간 설정 (선택 사항) - 3분
             pipe.expire(self.get_session_key(user_id), 180)
 
             # 명령 실행

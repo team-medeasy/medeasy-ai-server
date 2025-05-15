@@ -68,6 +68,7 @@ async def generate_initial_response(state: AgentState) -> AgentState:
         tool_calls = _extract_tool_calls(initial_response)
         state["tool_calls"] = tool_calls
         state["initial_response"] = initial_response.content
+        logger.info(f"initial response: {initial_response.content}")
         logger.info("메시지와 어울리는 도구 호출 완료")
     except Exception as e:
         logger.exception(f"초기 응답 생성 중 오류: {e}")
