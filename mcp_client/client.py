@@ -168,11 +168,8 @@ async def _get_initial_response(
     # 사용자 메시지 추가
     messages.append({"role": "user", "content": user_message})
 
-    logger.info(f"tool selector messages: {messages}")
-
     # TODO 벡터 데이터베이스로 대체
     response: BaseMessage = await llm_with_tools.ainvoke(messages)
-    logger.info(f"Initial response received: {response}")
     return response
 
 def _condense_chat_history(chat_history: str) -> str:
