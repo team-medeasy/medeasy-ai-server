@@ -110,7 +110,20 @@ async def process_message_voice(
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
 
-@router.get("/message/routine", description="ai 채팅 복약 일정 조회 버튼 api")
+@router.get("/message/routine",
+            description="""
+            ai 채팅 복약 일정 조회 버튼 api
+            
+            응답값: 
+            
+            text_response: 응답 텍스트 메시지 
+            
+            audio_base64: base64 인코딩 오디오 파일
+            
+            audio_format: 인코딩 전 오디오 포맷 
+            
+            action: 프론트엔드 액션 ex) 처방전 촬영, 알약 촬영 등  
+            """)
 async def get_routine_info(
     start_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
     end_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
@@ -157,7 +170,8 @@ async def get_routine_info(
     mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
     return JSONResponse(content={
-        "text": message,
+        "text_response": message,
         "audio_base64": mp3_base64,
-        "audio_format": "mp3"
+        "audio_format": "mp3",
+        "action" : None
     })
