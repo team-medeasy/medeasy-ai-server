@@ -1,13 +1,13 @@
 import asyncio
 import logging
 import os
-from typing import Optional, Tuple, List
+from typing import Optional, List
 
 from mcp_use import MCPClient
 from mcp_use.adapters import LangChainAdapter
 from langchain_core.tools import Tool
 
-from mcp_client.retry_utils import with_retry, exponential_backoff
+from mcp_client.util.retry_utils import with_retry, exponential_backoff
 
 logger = logging.getLogger(__name__)
 

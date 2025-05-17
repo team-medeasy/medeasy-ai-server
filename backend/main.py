@@ -7,13 +7,13 @@ from backend.config.middleware_config import LoggingMiddleware
 import logging
 
 from mcp_client import initialize_service
-from mcp_client.tool_manager import tool_manager
+from mcp_client.manager.tool_manager import tool_manager
 
 logging.basicConfig(level=logging.INFO)
 from contextlib import asynccontextmanager
 
 from backend.api.routes import medicine
-from mcp_client.mcp_router import router as mcp_router
+from mcp_client.router.mcp_router import router as mcp_router
 
 from backend.db.elastic import check_elasticsearch_connection, es
 from backend.config.logging_config import setup_logging

@@ -8,8 +8,8 @@ from mcp_client.client import _execute_tool_calls, _generate_final_response, _ge
     format_chat_history
 from mcp_client.fallback_handler import generate_fallback_response
 from mcp_client.prompt import system_prompt, final_response_system_prompt
-from mcp_client.retry_utils import with_retry
-from mcp_client.tool_manager import tool_manager
+from mcp_client.util.retry_utils import with_retry
+from mcp_client.manager.tool_manager import tool_manager
 
 logger = logging.getLogger(__name__)
 

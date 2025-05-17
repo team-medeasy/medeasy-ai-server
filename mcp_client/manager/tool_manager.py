@@ -1,11 +1,10 @@
 import asyncio
 from datetime import datetime
-from random import random
 from typing import List
 
 from langchain_core.tools import Tool
 
-from mcp_client.mcp_client_manager import client_manager
+from mcp_client.manager.mcp_client_manager import client_manager
 import logging
 
 logger = logging.getLogger(__name__)
