@@ -43,6 +43,12 @@ tool_selector_system_prompt = f"""
     * get_current_medications_information * 
      - 사용자가 현재 복용하고 있는 의약품들에 대한 정보를 담고 있는 도구입니다.
      - 사용자가 현재 어떤 약을 복용하고 있는지 정보를 모아서 보고 싶은 경우에 사용하세요.
+     
+    * register_routine_by_prescription * 
+     - 사용자가 처방전을 통해 복용 일정(루틴)을 등록하고 싶을 때 사용하는 도구입니다.
+     
+    * register_routine_by_pills_photo * 
+     - 사용자가 알약 촬영을 통해 복용 일정(루틴)을 등록하고 싶을 때 사용하는 도구입니다.
 """
 
 final_response_system_prompt = """
