@@ -1,6 +1,9 @@
-from datetime import datetime
+import os
+from datetime import datetime, date
 
-from fastapi import APIRouter, HTTPException, Header, Response
+import httpx
+import pytz
+from fastapi import APIRouter, HTTPException, Header, Response, Query
 from pydantic import BaseModel
 from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
@@ -8,6 +11,7 @@ from mcp_client.tts import convert_text_to_speech
 import logging
 from mcp_client.medeasy_agent import process_user_message
 
+kst = pytz.timezone('Asia/Seoul')
 logger = logging.getLogger(__name__)
 
 # 요청 모델 정의
@@ -100,3 +104,41 @@ async def process_message_voice(
     except Exception as e:
         # 오류 처리
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+
+
+@router.get("/message/routine")
+async def get_routine_info(
+    start_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
+    end_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
+    authorization: str = Header(None)  # Authorization 헤더에서 토큰 가져오기
+):
+    api_url = f"{os.getenv('MCP_SERVER_HOST')}/routine"
+
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "")
+
+    if token is None:
+        raise HTTPException(status_code=403, detail=f"Invalid Format Authorization Token")
+
+    user_id = get_user_id_from_token(token)
+    logger.info(f"Received message from user {user_id}")
+
+    params = {
+        "jwt_token": token,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat()
+    }
+
+    # 비동기 HTTP 클라이언트를 사용하여 API 요청 보내기
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, params=params)
+            response.raise_for_status()  # 4XX, 5XX 에러 발생 시 예외 발생
+            return response.json()  # API 응답을 JSON으로 변환하여 반환
+        except httpx.HTTPStatusError as e:
+            # HTTP 상태 코드 에러 처리
+            return {"error": f"API 요청 실패: {e.response.status_code}", "detail": e.response.text}
+        except httpx.RequestError as e:
+            # 네트워크 관련 에러 처리 (타임아웃, 연결 오류 등)
+            return {"error": f"API 요청 중 오류 발생: {str(e)}"}
