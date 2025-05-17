@@ -1,3 +1,4 @@
+import base64
 import os
 from datetime import datetime, date
 
@@ -5,6 +6,9 @@ import httpx
 import pytz
 from fastapi import APIRouter, HTTPException, Header, Response, Query
 from pydantic import BaseModel
+from starlette.responses import JSONResponse
+
+from mcp_client.chat_session_repo import chat_session_repo
 from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.tts import convert_text_to_speech
@@ -106,7 +110,7 @@ async def process_message_voice(
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
 
-@router.get("/message/routine")
+@router.get("/message/routine", description="ai 채팅 복약 일정 조회 버튼 api")
 async def get_routine_info(
     start_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
     end_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
@@ -114,6 +118,7 @@ async def get_routine_info(
 ):
     api_url = f"{os.getenv('MCP_SERVER_HOST')}/routine"
 
+    # JWT 파싱
     token = None
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
@@ -124,21 +129,35 @@ async def get_routine_info(
     user_id = get_user_id_from_token(token)
     logger.info(f"Received message from user {user_id}")
 
+    # mcp server 요청
     params = {
         "jwt_token": token,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat()
     }
 
-    # 비동기 HTTP 클라이언트를 사용하여 API 요청 보내기
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(api_url, params=params)
             response.raise_for_status()  # 4XX, 5XX 에러 발생 시 예외 발생
-            return response.json()  # API 응답을 JSON으로 변환하여 반환
+            response = response.json()  # API 응답을 JSON으로 변환하여 반환
+
+            message = response["message"]
         except httpx.HTTPStatusError as e:
             # HTTP 상태 코드 에러 처리
             return {"error": f"API 요청 실패: {e.response.status_code}", "detail": e.response.text}
         except httpx.RequestError as e:
             # 네트워크 관련 에러 처리 (타임아웃, 연결 오류 등)
             return {"error": f"API 요청 중 오류 발생: {str(e)}"}
+
+    chat_session_repo.add_message(user_id=user_id, role="user", message="복약 일정을 조회해줘")
+    chat_session_repo.add_message(user_id=user_id, role="system", message=message)
+
+    mp3_bytes: bytes = await convert_text_to_speech(message)
+    mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
+
+    return JSONResponse(content={
+        "text": message,
+        "audio_base64": mp3_base64,
+        "audio_format": "mp3"
+    })
