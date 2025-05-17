@@ -1,13 +1,18 @@
+from datetime import date
+
+from fastapi import HTTPException
 from langchain_core.tools import Tool
 from langgraph.graph import StateGraph
 from typing import TypedDict, List, Dict, Optional, Tuple, Any
 import logging
 
+from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.chat_session_repo import chat_session_repo
 from mcp_client.client import _execute_tool_calls, _generate_final_response, _get_initial_response, _extract_tool_calls, \
     format_chat_history
 from mcp_client.fallback_handler import generate_fallback_response
 from mcp_client.prompt import system_prompt, final_response_system_prompt
+from mcp_client.service.routine_service import get_routine_list
 from mcp_client.util.retry_utils import with_retry
 from mcp_client.manager.tool_manager import tool_manager
 
@@ -15,15 +20,18 @@ logger = logging.getLogger(__name__)
 
 # 상태 정의
 class AgentState(TypedDict):
-    messages: str  # 대화 이력
+    messages: Optional[str]  # 대화 이력
     user_id: int  # 사용자 ID
+    server_action: Optional[str] # 서버에서 도구 사용없이 바로 수행할 기능
+    data: Dict[str, Any] # 클라이언트에서 넘겨준 데이터
+    jwt_token: Optional[str]
     current_message: str  # 현재 처리 중인 메시지
     available_tools: List[Tool]
     tool_calls: List[Dict]  # 호출할 도구 목록
     tool_results: List[Dict]  # 도구 실행 결과
     initial_response: Optional[str]
     final_response: Optional[str]  # 최종 응답
-    capture_request: Optional[str]  # 사진 촬영 요청 타입 (있는 경우)
+    client_action: Optional[str]  # 사진 촬영 요청 타입 (있는 경우)
     error: Optional[str]  # 오류 정보 (있는 경우)
 
 
@@ -76,7 +84,7 @@ async def generate_initial_response(state: AgentState) -> AgentState:
     return state
 
 
-async def check_capture_requests(state: AgentState) -> AgentState:
+async def check_client_actions(state: AgentState) -> AgentState:
     """특수 도구 호출(사진 촬영 등) 확인"""
     if not state.get("tool_calls"):
         return state
@@ -84,20 +92,44 @@ async def check_capture_requests(state: AgentState) -> AgentState:
     for tool_call in state["tool_calls"]:
         name = tool_call.get('function', {}).get('name')
         if name == 'register_routine_by_prescription':
-            state["capture_request"] = "CAPTURE_PRESCRIPTION"
-            state["final_response"] = "처방전 촬영해주세요."
+            state["client_action"] = "CAPTURE_PRESCRIPTION"
+            state["final_response"] = "가지고 계신 처방전을 촬영해주세요."
             break
         elif name == 'register_routine_by_pills_photo':
-            state["capture_request"] = "CAPTURE_PILLS_PHOTO"
+            state["client_action"] = "CAPTURE_PILLS_PHOTO"
             state["final_response"] = "알약 사진을 촬영해주세요."
             break
 
     return state
 
+async def check_server_actions(state: AgentState) -> AgentState:
+    """
+    서버에서 바로 다이렉트로 기능 수행할 점이 있는지 ai 도구 선택이 필요 없는 경우
+    TODO routine 조회
+    """
+    server_action: str=state.get("server_action")
+    jwt_token: str = state.get("jwt_token")
+
+    try:
+        if server_action == "GET_ROUTINE_LIST_TODAY":
+            today = date.today()
+            routine_result:str = await get_routine_list(today, today, jwt_token)
+            state["final_response"] = routine_result
+
+    except HTTPException as e:
+        logger.error(f"서버 액션 처리 중 HTTP 오류: {e.detail}")
+        state["error"] = f"서버 요청 실패: {e.detail}"
+    except Exception as e:
+        logger.exception(f"서버 액션 처리 중 예외 발생: {str(e)}")
+        state["error"] = f"서버 액션 처리 오류: {str(e)}"
+
+    return state
+
+
 
 async def execute_tools(state: AgentState) -> AgentState:
     """도구 실행"""
-    if "capture_request" in state and state["capture_request"]:
+    if "client_action" in state and state["client_action"]:
         # 특수 도구 호출이 있으면 일반 도구 실행 건너뜀
         return state
 
@@ -178,14 +210,21 @@ async def save_conversation(state: AgentState) -> AgentState:
 
 
 # 조건 함수들
+def has_server_action(state: AgentState) -> str:
+    """서버에서 직접 처리할 요청이 있는지 확인"""
+    return "server_action" if ("server_action" in state and state["server_action"]) else "load_tools"
+
 def has_error(state: AgentState) -> str:
     """오류가 있는지 확인"""
     return "error" if ("error" in state and state["error"]) else "continue"
 
-
 def has_capture_request(state: AgentState) -> str:
     """캡처 요청이 있는지 확인"""
-    return "capture" if ("capture_request" in state and state["capture_request"]) else "continue"
+    return (
+        "capture"
+        if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]
+        else "continue"
+    )
 
 
 def has_tool_calls(state: AgentState) -> str:
@@ -200,15 +239,25 @@ def build_agent_graph():
 
     # 노드 추가
     graph.add_node("retrieve_context", retrieve_context)
+    graph.add_node("check_server_actions", check_server_actions)
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
-    graph.add_node("check_capture_requests", check_capture_requests)
+    graph.add_node("check_client_actions", check_client_actions)
     graph.add_node("execute_tools", execute_tools)
     graph.add_node("generate_final_response", generate_final_response)
     graph.add_node("save_conversation", save_conversation)
 
     # 엣지 연결
-    graph.add_edge("retrieve_context", "load_tools")
+    graph.add_conditional_edges(
+        "retrieve_context",
+        has_server_action,
+        {
+            "server_action": "check_server_actions",
+            "load_tools": "load_tools"
+        }
+    )
+    graph.add_edge("check_server_actions", "save_conversation")
+
     graph.add_conditional_edges(
         "load_tools",
         has_error,
@@ -222,11 +271,11 @@ def build_agent_graph():
         has_error,
         {
             "error": "generate_final_response",
-            "continue": "check_capture_requests"
+            "continue": "check_client_actions"
         }
     )
     graph.add_conditional_edges(
-        "check_capture_requests",
+        "check_client_actions",
         has_capture_request,
         {
             "capture": "save_conversation",
@@ -251,34 +300,51 @@ def build_agent_graph():
 
 
 # 메인 함수
-async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Optional[str]]:
+async def process_user_message(server_action:str, data: Dict[str, Any], user_message: str, jwt_token: str) -> Tuple[str, Optional[str]]:
     """
     사용자의 메시지에 대해 LangGraph를 사용하여 요청 처리
 
     Args:
+        server_action (str): 서버에서 AI 추론을 거치지 않고 수행할 기능
+        data(str): 클라이언트에서 제공한 데이터
         user_message (str): 사용자가 입력한 메시지 내용.
-        user_id (int): 사용자 식별자
+        jwt_token (str): authorization token
 
     Returns:
         message: str: LLM 응답 메시지
         capture_request: Optional[str]: 캡처 요청 타입 (있는 경우)
     """
+    user_id = get_user_id_from_token(jwt_token)
+
     # 초기 상태 구성
     initial_state: AgentState = {
-        "messages": str,
-        "user_id": user_id,
+        "messages": None,
+        "user_id": int(user_id),
+        "server_action": server_action,
+        "data": data,
+        "jwt_token": jwt_token,
         "current_message": user_message,
         "available_tools": [],
         "tool_calls": [],
         "tool_results": [],
         "initial_response": None,
         "final_response": None,
-        "capture_request": None,
-        "error": None
+        "client_action": None,
+        "error": None,
     }
 
-    # 그래프 실행
-    agent_graph = build_agent_graph()
-    final_state = await agent_graph.ainvoke(initial_state)
+    try:
+        agent_graph = build_agent_graph()
 
-    return final_state["final_response"], final_state.get("capture_request")
+        try:
+            final_state = await agent_graph.ainvoke(initial_state)
+        except Exception as e:
+            logger.error(f"그래프 실행 중 오류 발생: {str(e)}", exc_info=True)
+            # 오류 발생 시 기본 응답 생성
+            return f"죄송합니다. 요청을 처리하는 중 오류가 발생했습니다: {str(e)}", None
+
+    except Exception as e:
+        logger.error(f"그래프 구성 중 오류 발생: {str(e)}", exc_info=True)
+        return "시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", None
+
+    return final_state["final_response"], final_state.get("client_action")
