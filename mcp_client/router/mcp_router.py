@@ -4,7 +4,7 @@ from datetime import datetime, date
 
 import httpx
 import pytz
-from fastapi import APIRouter, HTTPException, Header, Response, Query
+from fastapi import APIRouter, HTTPException, Header, Query
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
@@ -13,7 +13,7 @@ from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.tts import convert_text_to_speech
 import logging
-from mcp_client.medeasy_agent import process_user_message
+from mcp_client.agent.medeasy_agent import process_user_message
 
 kst = pytz.timezone('Asia/Seoul')
 logger = logging.getLogger(__name__)

@@ -7,18 +7,21 @@ from backend.config.middleware_config import LoggingMiddleware
 import logging
 
 from mcp_client import initialize_service
-from mcp_client.tool_manager import tool_manager
+from mcp_client.manager.tool_manager import tool_manager
 
 logging.basicConfig(level=logging.INFO)
 from contextlib import asynccontextmanager
 
 from backend.api.routes import medicine
-from mcp_client.mcp_router import router as mcp_router
+from mcp_client.router.mcp_router import router as mcp_router
+from mcp_client.router.mcp_websocket_router import router as mcp_websocket_router
 
 from backend.db.elastic import check_elasticsearch_connection, es
 from backend.config.logging_config import setup_logging
 from backend.exceptionhandler.api_exception_handler import register_exception_handler
 from backend.config.swagger_config import setup_swagger
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,6 +69,7 @@ register_exception_handler(app)
 # 라우터 등록
 app.include_router(medicine.router, prefix="/v2")
 app.include_router(mcp_router, prefix="/v2")
+app.include_router(mcp_websocket_router, prefix="")
 
 setup_logging()
 logger = logging.getLogger(__name__)
