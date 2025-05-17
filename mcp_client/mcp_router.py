@@ -93,17 +93,15 @@ async def process_message_voice(
 
         # response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
         response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
-        mp3_response = await convert_text_to_speech(response)
+        mp3_bytes = await convert_text_to_speech(response)
+        mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
-        headers = {
-            "X-Action": action if action else ""
-        }
-
-        return Response(
-            content=mp3_response,
-            media_type="audio/mpeg",
-            headers=headers
-        )
+        return JSONResponse(content={
+            "text_response": response,
+            "audio_base64": mp3_base64,
+            "audio_format": "mp3",
+            "action": action
+        })
 
     except Exception as e:
         # 오류 처리
