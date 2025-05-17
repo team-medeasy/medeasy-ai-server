@@ -129,8 +129,6 @@ async def get_routine_info(
     end_date: date = Query(default=datetime.now(kst).date(), description="Query start date (default: today)"),
     authorization: str = Header(None)  # Authorization 헤더에서 토큰 가져오기
 ):
-    api_url = f"{os.getenv('MCP_SERVER_HOST')}/routine"
-
     # JWT 파싱
     token = None
     if authorization and authorization.startswith("Bearer "):
@@ -143,6 +141,7 @@ async def get_routine_info(
     logger.info(f"Received message from user {user_id}")
 
     # mcp server 요청
+    api_url = f"{os.getenv('MCP_SERVER_HOST')}/routine"
     params = {
         "jwt_token": token,
         "start_date": start_date.isoformat(),
@@ -163,9 +162,11 @@ async def get_routine_info(
             # 네트워크 관련 에러 처리 (타임아웃, 연결 오류 등)
             return {"error": f"API 요청 중 오류 발생: {str(e)}"}
 
+    # 메시지 저장
     chat_session_repo.add_message(user_id=user_id, role="user", message="복약 일정을 조회해줘")
     chat_session_repo.add_message(user_id=user_id, role="system", message=message)
 
+    # 응답
     mp3_bytes: bytes = await convert_text_to_speech(message)
     mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
