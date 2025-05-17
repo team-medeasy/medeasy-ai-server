@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Any, Dict, Optional, List, Tuple
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
 import os
@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_client.json")
 
 # Create LLM
-final_response_llm= ChatOpenAI(model_name="gpt-3.5-turbo-16k")
-tool_llm = ChatOpenAI(model_name="gpt-4o-mini")
+final_response_llm= ChatOpenAI(model_name="gpt-4.1-nano")
+tool_llm = ChatOpenAI(model_name="gpt-4.1-nano")
 
 # SSE 연결 오류를 위한 재시도 데코레이터
 @retry(
