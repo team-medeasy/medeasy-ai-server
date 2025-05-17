@@ -39,13 +39,13 @@ jobs:
         run: |
           docker build --platform linux/amd64 -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f ./Dockerfile .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-
-      - name: deploy to Server
-        uses: appleboy/ssh-action@v0.1.8
-        with:
-          host: ${{secrets.MEDEASY_K3S_HOST}}
-          username: ${{ secrets.MEDEASY_USERNAME }}
-          key: ${{ secrets.MEDEASY_PEM }}
-          script: |
-            set -x
-            sh deploy-fastapi.sh
+#
+#      - name: deploy to Server
+#        uses: appleboy/ssh-action@v0.1.8
+#        with:
+#          host: ${{secrets.MEDEASY_K3S_HOST}}
+#          username: ${{ secrets.MEDEASY_USERNAME }}
+#          key: ${{ secrets.MEDEASY_PEM }}
+#          script: |
+#            set -x
+#            sh deploy-fastapi.sh
