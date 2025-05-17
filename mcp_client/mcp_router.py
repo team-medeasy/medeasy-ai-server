@@ -153,14 +153,24 @@ async def get_routine_info(
             response = await client.get(api_url, params=params)
             response.raise_for_status()  # 4XX, 5XX 에러 발생 시 예외 발생
             response = response.json()  # API 응답을 JSON으로 변환하여 반환
-
             message = response["message"]
+
         except httpx.HTTPStatusError as e:
-            # HTTP 상태 코드 에러 처리
-            return {"error": f"API 요청 실패: {e.response.status_code}", "detail": e.response.text}
+            status = e.response.status_code
+            detail = e.response.text
+
+            if status == 400:
+                raise HTTPException(status_code=400, detail="잘못된 요청입니다. 입력 값을 확인해주세요.")
+            elif status == 403:
+                raise HTTPException(status_code=403, detail="권한이 없습니다. 인증 토큰을 확인해주세요.")
+            elif status == 404:
+                raise HTTPException(status_code=404, detail="요청하신 리소스를 찾을 수 없습니다.")
+            elif status == 500:
+                raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다.")
+            else:
+                raise HTTPException(status_code=status, detail=f"알 수 없는 오류 발생: {detail}")
         except httpx.RequestError as e:
-            # 네트워크 관련 에러 처리 (타임아웃, 연결 오류 등)
-            return {"error": f"API 요청 중 오류 발생: {str(e)}"}
+            raise HTTPException(status_code=502, detail=f"외부 API 서버와의 연결 실패: {str(e)}")
 
     # 메시지 저장
     chat_session_repo.add_message(user_id=user_id, role="user", message="복약 일정을 조회해줘")
