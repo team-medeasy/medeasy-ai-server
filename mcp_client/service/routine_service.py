@@ -262,8 +262,7 @@ def format_prescription_for_voice(prescriptions: List[Dict[str, Any]]) -> str:
         lines.append(f"권장 복용 시간은 {schedule_text}입니다.")
 
     # 마무리 문구
-    lines.append("복약 일정이 등록되었으니, 시간에 맞춰 복용해 주세요.")
-    lines.append("상세한 내용은 복약 관리 페이지에서 확인하실 수 있습니다.")
+    lines.append("분석 정보가 정확한지 확인해주시고, 복용 일정 등록을 요청해주세요!")
 
     return " ".join(lines)
 
