@@ -6,7 +6,6 @@ from typing import List, Dict, Any
 from fastapi import HTTPException
 
 from mcp_client.agent.agent_send_message import agent_send_message
-from mcp_client.agent.agent_types import init_state
 from mcp_client.agent.medeasy_agent import AgentState
 from mcp_client.service.routine_service import get_routine_list, register_routine_by_prescription, \
     format_prescription_for_voice, register_routine_list
@@ -59,8 +58,8 @@ async def check_server_actions(state: AgentState) -> AgentState:
             message = "복약 일정 등록을 진행하고 있습니다. 잠시만 기다려주세요."
             await agent_send_message(state=state, message=message)
 
-            init_state(state=state)
             state['final_response'] = await register_routine_list(jwt_token, data)
+            state['client_action'] = None
 
 
     except HTTPException as e:

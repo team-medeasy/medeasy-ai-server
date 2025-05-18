@@ -1,202 +1,14 @@
-import base64
-from datetime import date
-
-from fastapi import HTTPException
-from langchain_core.tools import Tool
 from langgraph.graph import StateGraph
-from typing import TypedDict, List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any
 import logging
 
 from starlette.websockets import WebSocket
 
-from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.agent.agent_types import AgentState
-from mcp_client.agent.check_server_actions import check_server_actions
-from mcp_client.chat_session_repo import chat_session_repo
-from mcp_client.client import _execute_tool_calls, _generate_final_response, _get_initial_response, _extract_tool_calls, \
-    format_chat_history
-from mcp_client.fallback_handler import generate_fallback_response
-from mcp_client.prompt import system_prompt, final_response_system_prompt
-from mcp_client.util.retry_utils import with_retry
-from mcp_client.manager.tool_manager import tool_manager
+from mcp_client.agent.node import *
+from mcp_client.agent.node import detect_conversation_shift, direction_router
 
 logger = logging.getLogger(__name__)
-
-
-# 노드 함수들
-async def retrieve_context(state: AgentState) -> AgentState:
-    """채팅 이력을 가져와 컨텍스트에 추가"""
-    user_id = state["user_id"]
-    logger.info("채팅 이력 조회")
-    recent_messages: List[Dict[str, Any]] = chat_session_repo.get_recent_messages(user_id, 7)
-    state["messages"] = format_chat_history(recent_messages)
-    logger.info("채팅 이력 조회 완료")
-    return state
-
-
-async def load_tools(state: AgentState) -> AgentState:
-    """도구 관리자에서 도구 로드"""
-    try:
-        logger.info("도구 로딩")
-        tools = await tool_manager.get_tools()
-        state["available_tools"] = tools
-        logger.info("도구 로딩 완료")
-    except Exception as e:
-        logger.warning(f"도구 로딩 에러: {e}")
-        state["error"] = f"도구 로딩 실패: {str(e)}"
-    return state
-
-
-async def generate_initial_response(state: AgentState) -> AgentState:
-    """초기 응답 생성 및 도구 호출 추출"""
-    if "error" in state and state["error"]:
-        return state
-
-    try:
-        logger.info("메시지와 어울리는 도구 호출")
-        initial_response = await with_retry(
-            lambda: _get_initial_response(
-                jwt_token=state["jwt_token"],
-                user_message=state["current_message"],
-                tools=state["available_tools"],
-                chat_history=state["messages"]
-            )
-        )
-        tool_calls = _extract_tool_calls(initial_response)
-        state["tool_calls"] = tool_calls
-        state["initial_response"] = initial_response.content
-        logger.info(f"initial response: {initial_response.content}")
-        logger.info("메시지와 어울리는 도구 호출 완료")
-    except Exception as e:
-        logger.exception(f"초기 응답 생성 중 오류: {e}")
-        state["error"] = f"초기 응답 생성 실패: {str(e)}"
-    return state
-
-
-async def check_client_actions(state: AgentState) -> AgentState:
-    """특수 도구 호출(사진 촬영 등) 확인"""
-    if not state.get("tool_calls"):
-        return state
-
-    for tool_call in state["tool_calls"]:
-        name = tool_call.get('function', {}).get('name')
-        if name == 'register_routine_by_prescription':
-            state["client_action"] = "CAPTURE_PRESCRIPTION"
-            state["final_response"] = "가지고 계신 처방전을 촬영해주세요."
-            break
-        elif name == 'register_routine_by_pills_photo':
-            state["client_action"] = "CAPTURE_PILLS_PHOTO"
-            state["final_response"] = "알약 사진을 촬영해주세요."
-            break
-
-    return state
-
-
-
-async def execute_tools(state: AgentState) -> AgentState:
-    """도구 실행"""
-    if "client_action" in state and state["client_action"]:
-        # 특수 도구 호출이 있으면 일반 도구 실행 건너뜀
-        return state
-
-    if not state.get("tool_calls"):
-        # 도구 호출이 없는 경우 초기 응답을 최종 응답으로 사용
-        state["final_response"] = state.get("initial_response", "")
-        return state
-
-    try:
-        logger.info("도구 실행")
-        tool_results = await with_retry(
-            lambda: _execute_tool_calls(
-                state["tool_calls"],
-                state["available_tools"]
-            )
-        )
-        state["tool_results"] = tool_results
-        logger.info("도구 실행 완료")
-    except Exception as e:
-        logger.exception(f"도구 실행 중 오류: {e}")
-        state["error"] = f"도구 실행 실패: {str(e)}"
-
-    return state
-
-
-async def generate_final_response(state: AgentState) -> AgentState:
-    """최종 응답 생성"""
-    if "final_response" in state and state["final_response"]:
-        # 이미 최종 응답이 있는 경우 (캡처 요청 등) 건너뜀
-        return state
-
-    if "error" in state and state["error"]:
-        # 오류가 있는 경우 대체 응답 생성
-        fallback = await generate_fallback_response(
-            system_prompt,
-            state["current_message"],
-            state["error"]
-        )
-        state["final_response"] = fallback
-        return state
-
-    try:
-        logger.info("최종 응답 생성")
-        final_response = await with_retry(
-            lambda: _generate_final_response(
-                final_response_system_prompt,
-                state["current_message"],
-                state.get("tool_calls", []),
-                state.get("tool_results", [])
-            )
-        )
-        state["final_response"] = final_response
-        logger.info("최종 응답 생성 완료")
-    except Exception as e:
-        logger.exception(f"최종 응답 생성 중 오류: {e}")
-        fallback = await generate_fallback_response(
-            system_prompt,
-            state["current_message"],
-            str(e)
-        )
-        state["final_response"] = fallback
-
-    return state
-
-
-async def save_conversation(state: AgentState) -> AgentState:
-    """대화 내용 저장"""
-    user_id = state["user_id"]
-    user_message = state["current_message"]
-    final_response = state["final_response"]
-
-    logger.info("대화 내용 저장")
-    chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
-    chat_session_repo.add_message(user_id=user_id, role="system", message=final_response)
-    logger.info("대화 내용 저장완료")
-
-    return state
-
-
-# 조건 함수들
-def has_server_action(state: AgentState) -> str:
-    """서버에서 직접 처리할 요청이 있는지 확인"""
-    return "server_action" if ("server_action" in state and state["server_action"]) else "load_tools"
-
-def has_error(state: AgentState) -> str:
-    """오류가 있는지 확인"""
-    return "error" if ("error" in state and state["error"]) else "continue"
-
-def has_capture_request(state: AgentState) -> str:
-    """캡처 요청이 있는지 확인"""
-    return (
-        "capture"
-        if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]
-        else "continue"
-    )
-
-
-def has_tool_calls(state: AgentState) -> str:
-    """도구 호출이 있는지 확인"""
-    return "tools" if state.get("tool_calls") else "no_tools"
-
 
 # 그래프 구성
 def build_agent_graph():
@@ -205,6 +17,7 @@ def build_agent_graph():
 
     # 노드 추가
     graph.add_node("retrieve_context", retrieve_context)
+    graph.add_node("detect_conversation_shift", detect_conversation_shift)
     graph.add_node("check_server_actions", check_server_actions)
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
@@ -219,9 +32,20 @@ def build_agent_graph():
         has_server_action,
         {
             "server_action": "check_server_actions",
-            "load_tools": "load_tools"
+            "detect_conversation_shift": "detect_conversation_shift"
         }
     )
+
+    graph.add_conditional_edges(
+        "detect_conversation_shift",
+        direction_router,
+        {
+            "check_server_actions": "check_server_actions",
+            "load_tools": "load_tools",
+            "save_conversation": "save_conversation",
+        }
+    )
+
     graph.add_edge("check_server_actions", "save_conversation")
 
     graph.add_conditional_edges(

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_client.json")
 
 # Create LLM
+gpt_nano= ChatOpenAI(model_name="gpt-4.1-nano")
 final_response_llm= ChatOpenAI(model_name="gpt-4.1-mini")
 tool_llm = ChatOpenAI(model_name="gpt-4.1-mini")
 
