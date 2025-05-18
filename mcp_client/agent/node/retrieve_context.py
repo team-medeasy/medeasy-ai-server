@@ -18,4 +18,4 @@ async def retrieve_context(state: AgentState) -> AgentState:
 
 def has_server_action(state: AgentState) -> str:
     """서버에서 직접 처리할 요청이 있는지 확인"""
-    return "server_action" if ("server_action" in state and state["server_action"]) else "load_tools"
+    return "server_action" if ("server_action" in state and state["server_action"]) else "detect_conversation_shift"

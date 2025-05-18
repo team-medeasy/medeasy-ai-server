@@ -71,7 +71,7 @@ async def websocket_message_voice(websocket: WebSocket):
         while True:
             # 1. 메시지 수신 (JSON 형식)
             client_message = await websocket.receive_json()
-            init_state(state)
+            init_state(state) # 랭그래프에서 원본 객체를 복사해서 사용 초기화 x 괜찮
 
             message = client_message.get("message")
             server_action = client_message.get("server_action")
@@ -99,6 +99,8 @@ async def websocket_message_voice(websocket: WebSocket):
                     data=response_data
                 ))
 
+                state["client_action"] = action
+                state["response_data"] = response_data
 
             except Exception as e:
                 text_message = "요청 처리 중 오류가 발생하였습니다.."

@@ -6,6 +6,7 @@ from mcp_client.agent.node.generate_initial_response import generate_initial_res
 from mcp_client.agent.node.check_client_actions import check_client_actions, has_capture_request
 from mcp_client.agent.node.execute_tools import execute_tools, has_tool_calls
 from mcp_client.agent.node.generate_final_response import generate_final_response
+from mcp_client.agent.node.detect_conversation_shift import detect_conversation_shift, direction_router
 
 from mcp_client.agent.node.save_conversation import save_conversation
 

@@ -1,6 +1,9 @@
 from typing import TypedDict, List, Dict, Optional, Any
 from starlette.websockets import WebSocket
 from langchain_core.tools import Tool
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 상태 정의
 class AgentState(TypedDict):
@@ -28,6 +31,9 @@ class AgentState(TypedDict):
     client_action: Optional[str]  # 사진 촬영 요청 타입 (있는 경우)
 
 def init_state(state: AgentState):
+    client_action = state.get("client_action")
+    response_data = state.get("response_data")
+
     state["current_message"]=""
     state["data"] = None
     state["messages"] = None
@@ -39,3 +45,11 @@ def init_state(state: AgentState):
     state["final_response"] = None
     state["error"] = None
     state["direction"] = None
+
+    # 보존해야 할 값 복원
+    state["client_action"] = client_action
+    state["response_data"] = response_data
+
+    logger.info(f"새로운 대화 상태 초기화, client_action: {client_action}, response_data: {'존재함' if response_data else 'None'}")
+
+    return state

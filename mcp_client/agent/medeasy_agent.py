@@ -6,6 +6,7 @@ from starlette.websockets import WebSocket
 
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node import *
+from mcp_client.agent.node import detect_conversation_shift, direction_router
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ def build_agent_graph():
 
     # 노드 추가
     graph.add_node("retrieve_context", retrieve_context)
+    graph.add_node("detect_conversation_shift", detect_conversation_shift)
     graph.add_node("check_server_actions", check_server_actions)
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
@@ -30,9 +32,20 @@ def build_agent_graph():
         has_server_action,
         {
             "server_action": "check_server_actions",
-            "load_tools": "load_tools"
+            "detect_conversation_shift": "detect_conversation_shift"
         }
     )
+
+    graph.add_conditional_edges(
+        "detect_conversation_shift",
+        direction_router,
+        {
+            "check_server_actions": "check_server_actions",
+            "load_tools": "load_tools",
+            "save_conversation": "save_conversation",
+        }
+    )
+
     graph.add_edge("check_server_actions", "save_conversation")
 
     graph.add_conditional_edges(

@@ -68,8 +68,8 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
 
         try:
             # GPT-Nano API 호출
-            intent_response = await gpt_nano.get_completion(classification_prompt)
-            intent = intent_response.strip().upper()
+            intent_response = await gpt_nano.ainvoke(classification_prompt)
+            intent = intent_response.content.strip().upper()
             logger.info(f"사용자 의도 감지: '{user_message}' -> {intent}")
 
             # 의도에 따른 처리
@@ -81,7 +81,8 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                     state["server_action"] = "REGISTER_ROUTINE_LIST"
                     state["data"] = routines_data
                     state["client_action"] = None
-                    state["direction"] = "check_server_action"
+                    state['response_data'] = None
+                    state["direction"] = "check_server_actions"
                 else:
                     state["final_response"] = "죄송합니다. 처방전 데이터를 찾을 수 없습니다. 다시 처방전을 업로드해주시겠어요?"
                     state["client_action"] = None
@@ -247,11 +248,11 @@ async def modify_prescription_data(
 
     try:
         # GPT 응답 분석
-        modification_response = await gpt_nano.get_completion(modification_prompt)
+        modification_response = await gpt_nano.ainvoke(modification_prompt)
 
         # JSON 파싱 시도
         try:
-            modifications = json.loads(modification_response)
+            modifications = json.loads(modification_response.content)
 
             # 단일 수정 사항인 경우 리스트로 변환
             if not isinstance(modifications, list):
@@ -303,3 +304,33 @@ async def modify_prescription_data(
         logger.error(f"처방전 데이터 수정 중 오류: {str(e)}", exc_info=True)
 
     return modified_data
+
+
+def direction_router(state: AgentState) -> str:
+    """
+    AgentState의 direction 값에 따라 다음 실행할 노드를 결정하는 엣지 함수
+
+    Args:
+        state: 현재 에이전트 상태
+
+    Returns:
+        str: 다음 실행할 노드 이름
+    """
+    # direction 값 확인 (없으면 기본값으로 'save_conversation' 사용)
+    direction = state.get("direction")
+
+    # direction 로깅
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"대화 흐름 방향 결정: direction={direction}")
+
+    # 방향에 따른 노드 결정
+    if direction == "check_server_actions":
+        return "check_server_actions"
+    elif direction == "load_tools":
+        return "load_tools"
+    elif direction == "save_conversation":
+        return "save_conversation"
+    else:
+        # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
+        return "load_tools"
