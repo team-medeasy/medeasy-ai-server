@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_client.json")
 
 # Create LLM
-final_response_llm= ChatOpenAI(model_name="gpt-4.1-nano")
-tool_llm = ChatOpenAI(model_name="gpt-4.1-nano")
+final_response_llm= ChatOpenAI(model_name="gpt-4.1-mini")
+tool_llm = ChatOpenAI(model_name="gpt-4.1-mini")
 
 # SSE 연결 오류를 위한 재시도 데코레이터
 @retry(
@@ -137,6 +137,7 @@ async def process_user_message(user_message: str, user_id: int) -> Tuple[str, Op
         return fallback_response, None
 
 async def _get_initial_response(
+    jwt_token: str,
     user_message: str,
     tools: List[Tool],
     chat_history: Optional[str] = None,
@@ -156,7 +157,8 @@ async def _get_initial_response(
     # 채팅 이력이 있는 경우 프롬프트에 포함
 
     messages = [
-        {"role": "system", "content": tool_selector_system_prompt}
+        {"role": "developer", "content": tool_selector_system_prompt+final_response_system_prompt},
+        {"role": "user", "content": f"jwt_token: {jwt_token}"},
     ]
 
     # 채팅 이력이 있는 경우만 포함 (토큰 절약)
@@ -168,7 +170,6 @@ async def _get_initial_response(
     # 사용자 메시지 추가
     messages.append({"role": "user", "content": user_message})
 
-    # TODO 벡터 데이터베이스로 대체
     response: BaseMessage = await llm_with_tools.ainvoke(messages)
     return response
 

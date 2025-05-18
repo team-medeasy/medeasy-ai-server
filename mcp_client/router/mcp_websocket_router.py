@@ -5,6 +5,7 @@ import base64
 import logging
 
 from backend.auth.jwt_token_helper import get_user_id_from_token
+from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.medeasy_agent import process_user_message
 from mcp_client.service.hello_service import hello_web_socket_connection
 from mcp_client.tts import convert_text_to_speech
@@ -46,6 +47,25 @@ async def websocket_message_voice(websocket: WebSocket):
         data=None
     ))
 
+    # 초기 상태 구성
+    state: AgentState = {
+        "current_message": None,  # 현재 들어온 client 메시지
+        "messages": None,
+        "client_action": None,
+        "server_action": None,
+        "data": None,
+        "available_tools": [],
+        "tool_calls": [],
+        "tool_results": [],
+        "initial_response": None,
+        "error": None,
+        "user_id": int(user_id),
+        "jwt_token": jwt_token,
+        "websocket": websocket,  # 웹소켓 객체 추가
+        "final_response": None,
+        "response_data": None,
+    }
+
     try:
         while True:
             # 1. 메시지 수신 (JSON 형식)
@@ -55,18 +75,17 @@ async def websocket_message_voice(websocket: WebSocket):
             data = client_message.get("data")
 
             logger.info(f"WebSocket message from user {user_id}")
-            user_message = f"""
-                message_content: {message}
-                jwt_token: {jwt_token} 
-            """
 
             try:
-                # 3. 메시지 처리 및 응답 생성
-                response, action = await process_user_message(server_action=server_action, data=data, user_message=user_message, jwt_token=jwt_token)
+                state["server_action"] = server_action
+                state["data"] = data
+                state["current_message"] = message
+
+                response, action, response_data = await process_user_message(state=state)
                 mp3_bytes = await convert_text_to_speech(response)
                 mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
-                # 4. 응답 전송
+                # 응답 전송
                 await websocket.send_json(make_standard_response(
                     result_code=200,
                     result_message="요청을 성공적으로 처리하였습니다.",
@@ -74,7 +93,7 @@ async def websocket_message_voice(websocket: WebSocket):
                     audio_base64=mp3_base64,
                     audio_format="mp3",
                     client_action=action,
-                    data=None
+                    data=response_data
                 ))
 
 

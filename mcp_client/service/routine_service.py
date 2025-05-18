@@ -1,7 +1,10 @@
 import os
 import logging
 from datetime import date, datetime, timedelta
+from typing import Dict, Any, List
+import io
 
+import aiohttp
 import httpx
 import pytz
 from fastapi import HTTPException
@@ -151,3 +154,113 @@ async def get_medication_notifications(jwt_token: str) -> str:
         return "현재 복약을 잘하고 계십니다!"
 
     return "\n".join(notifications)
+
+
+async def register_routine_by_prescription(jwt_token: str, image_data: bytes) -> List[Dict[str, Any]]:
+    """
+    처방전 이미지를 서버에 업로드하여 복약 일정 등록
+
+    Args:
+        jwt_token: 사용자 JWT 토큰
+        image_data: 이미지 바이너리 데이터
+
+    Returns:
+        Dict[str, Any]: 서버 응답 데이터
+    """
+    url = f"{medeasy_api_url}/routine/prescription"
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+
+    # multipart/form-data 요청 준비
+    form_data = aiohttp.FormData()
+    form_data.add_field(
+        name='image',
+        value=io.BytesIO(image_data),
+        filename='prescription.jpg',
+        content_type='image/jpeg'
+    )
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, data=form_data) as response:
+            if response.status != 200:
+                error_text = await response.text()
+                raise Exception(f"처방전 등록 실패 (상태 코드: {response.status}): {error_text}")
+
+            result = await response.json()
+            logger.info(f"처방전 분석 결과 {result.get('body', {})}")
+            return result.get("body", {})
+
+
+def format_prescription_for_voice(prescriptions: List[Dict[str, Any]]) -> str:
+    """
+    처방전 데이터를 음성 안내용 텍스트로 요약
+
+    Args:
+        prescriptions: 처방전 정보 목록
+
+    Returns:
+        str: 음성 안내용 텍스트
+    """
+    if not prescriptions:
+        return "처방전 분석 결과, 등록된 약품이 없습니다. 다른 처방전을 시도하거나 수동으로 등록해 주세요."
+
+    # 약품 수 계산
+    med_count = len(prescriptions)
+
+    # 처방 일수 (모든 약이 같은 기간이라고 가정)
+    days = prescriptions[0].get("total_days", 0) if prescriptions else 0
+
+    # 공통 복용 시간 파악
+    all_schedules = set()
+    recommended_schedules = set()
+
+    for prescription in prescriptions:
+        for schedule in prescription.get("user_schedules", []):
+            schedule_name = schedule.get("name", "")
+            all_schedules.add(schedule_name)
+
+            if schedule.get("recommended", False):
+                recommended_schedules.add(schedule_name)
+
+    # 주요 약품 정보 추출 (최대 2개까지만 상세히 언급)
+    detailed_meds = []
+    for i, med in enumerate(prescriptions[:2]):
+        med_name = med.get("medicine_name", "")
+        # 약품명이 너무 길면 앞부분만 사용
+        if len(med_name) > 30:
+            # 첫 번째 괄호 위치 찾기
+            paren_idx = med_name.find('(')
+            if paren_idx > 0:
+                med_name = med_name[:paren_idx].strip()
+            else:
+                med_name = med_name[:30].strip()
+
+        class_name = med.get("class_name", "")
+        dose = med.get("dose", 1)
+
+        # 약품 타입 (일반/전문)
+        med_type = "일반의약품" if med.get("etc_otc_name") == "일반의약품" else "전문의약품"
+
+        detailed_meds.append(f"{med_name} {dose}정({class_name}, {med_type})")
+
+    # 나머지 약품이 있으면 개수만 언급
+    remaining = med_count - len(detailed_meds)
+    if remaining > 0:
+        detailed_meds.append(f"그 외 {remaining}개 약품")
+
+    # 음성 메시지 구성
+    lines = []
+    lines.append(f"처방전 분석이 완료되었습니다. 총 {med_count}개 약품이 {days}일분 처방되었습니다.")
+
+    # 약품 정보
+    lines.append("처방된 약품은 " + ", ".join(detailed_meds) + "입니다.")
+
+    # 복용 시간 안내
+    if recommended_schedules:
+        schedule_text = ", ".join(sorted(recommended_schedules))
+        lines.append(f"권장 복용 시간은 {schedule_text}입니다.")
+
+    # 마무리 문구
+    lines.append("복약 일정이 등록되었으니, 시간에 맞춰 복용해 주세요.")
+    lines.append("상세한 내용은 복약 관리 페이지에서 확인하실 수 있습니다.")
+
+    return " ".join(lines)
