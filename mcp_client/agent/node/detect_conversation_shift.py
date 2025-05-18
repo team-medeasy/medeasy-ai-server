@@ -101,8 +101,8 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                                 분석 결과만 답변해주세요: (INTENT_ONLY/WITH_DETAILS)
                                 """
 
-                modification_type = await gpt_nano.get_completion(modification_analysis_prompt)
-                modification_type = modification_type.strip().upper()
+                modification_type = await gpt_nano.ainvoke(modification_analysis_prompt)
+                modification_type = modification_type.content.strip().upper()
                 logger.info(f"수정 의도 세부 분석: '{user_message}' -> {modification_type}")
 
                 if "WITH_DETAILS" in modification_type:
