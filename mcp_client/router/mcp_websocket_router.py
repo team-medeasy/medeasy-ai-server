@@ -5,7 +5,7 @@ import base64
 import logging
 
 from backend.auth.jwt_token_helper import get_user_id_from_token
-from mcp_client.agent.agent_types import AgentState
+from mcp_client.agent.agent_types import AgentState, init_state
 from mcp_client.agent.medeasy_agent import process_user_message
 from mcp_client.service.hello_service import hello_web_socket_connection
 from mcp_client.tts import convert_text_to_speech
@@ -64,12 +64,15 @@ async def websocket_message_voice(websocket: WebSocket):
         "websocket": websocket,  # 웹소켓 객체 추가
         "final_response": None,
         "response_data": None,
+        "direction" : None
     }
 
     try:
         while True:
             # 1. 메시지 수신 (JSON 형식)
             client_message = await websocket.receive_json()
+            init_state(state)
+
             message = client_message.get("message")
             server_action = client_message.get("server_action")
             data = client_message.get("data")
