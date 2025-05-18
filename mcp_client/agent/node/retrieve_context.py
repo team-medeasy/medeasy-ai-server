@@ -15,3 +15,7 @@ async def retrieve_context(state: AgentState) -> AgentState:
     state["messages"] = format_chat_history(recent_messages)
     logger.info("채팅 이력 조회 완료")
     return state
+
+def has_server_action(state: AgentState) -> str:
+    """서버에서 직접 처리할 요청이 있는지 확인"""
+    return "server_action" if ("server_action" in state and state["server_action"]) else "load_tools"

@@ -16,3 +16,7 @@ async def load_tools(state: AgentState) -> AgentState:
         logger.warning(f"도구 로딩 에러: {e}")
         state["error"] = f"도구 로딩 실패: {str(e)}"
     return state
+
+def has_error(state: AgentState) -> str:
+    """오류가 있는지 확인"""
+    return "error" if ("error" in state and state["error"]) else "continue"

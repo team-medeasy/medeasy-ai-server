@@ -17,3 +17,11 @@ async def check_client_actions(state: AgentState) -> AgentState:
             break
 
     return state
+
+def has_capture_request(state: AgentState) -> str:
+    """캡처 요청이 있는지 확인"""
+    return (
+        "capture"
+        if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]
+        else "continue"
+    )

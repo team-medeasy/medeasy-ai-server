@@ -9,30 +9,6 @@ from mcp_client.agent.node import *
 
 logger = logging.getLogger(__name__)
 
-
-# 조건 함수들
-def has_server_action(state: AgentState) -> str:
-    """서버에서 직접 처리할 요청이 있는지 확인"""
-    return "server_action" if ("server_action" in state and state["server_action"]) else "load_tools"
-
-def has_error(state: AgentState) -> str:
-    """오류가 있는지 확인"""
-    return "error" if ("error" in state and state["error"]) else "continue"
-
-def has_capture_request(state: AgentState) -> str:
-    """캡처 요청이 있는지 확인"""
-    return (
-        "capture"
-        if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]
-        else "continue"
-    )
-
-
-def has_tool_calls(state: AgentState) -> str:
-    """도구 호출이 있는지 확인"""
-    return "tools" if state.get("tool_calls") else "no_tools"
-
-
 # 그래프 구성
 def build_agent_graph():
     """에이전트 처리 그래프 구성"""

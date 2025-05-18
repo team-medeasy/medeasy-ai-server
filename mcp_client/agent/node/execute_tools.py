@@ -32,3 +32,7 @@ async def execute_tools(state: AgentState) -> AgentState:
         state["error"] = f"도구 실행 실패: {str(e)}"
 
     return state
+
+def has_tool_calls(state: AgentState) -> str:
+    """도구 호출이 있는지 확인"""
+    return "tools" if state.get("tool_calls") else "no_tools"
