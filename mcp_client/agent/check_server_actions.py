@@ -6,9 +6,10 @@ from typing import List, Dict, Any
 from fastapi import HTTPException
 
 from mcp_client.agent.agent_send_message import agent_send_message
+from mcp_client.agent.agent_types import init_state
 from mcp_client.agent.medeasy_agent import AgentState
 from mcp_client.service.routine_service import get_routine_list, register_routine_by_prescription, \
-    format_prescription_for_voice
+    format_prescription_for_voice, register_routine_list
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,14 @@ async def check_server_actions(state: AgentState) -> AgentState:
             state["final_response"] = final_response
             state['response_data'] = prescription_response
             state['client_action'] = "REVIEW_PRESCRIPTION_REGISTER_RESPONSE"
+
+        elif server_action == "REGISTER_ROUTINE_LIST":
+            message = "복약 일정 등록을 진행하고 있습니다. 잠시만 기다려주세요."
+            await agent_send_message(state=state, message=message)
+
+            init_state(state=state)
+            state['final_response'] = await register_routine_list(jwt_token, data)
+
 
     except HTTPException as e:
         logger.error(f"서버 액션 처리 중 HTTP 오류: {e.detail}")
