@@ -19,6 +19,7 @@ async def execute_tools(state: AgentState) -> AgentState:
 
     try:
         logger.info("도구 실행")
+        logger.info(f"before execute tools node tool results: {state['tool_results']}")
         tool_results = await with_retry(
             lambda: _execute_tool_calls(
                 state["tool_calls"],
@@ -26,6 +27,7 @@ async def execute_tools(state: AgentState) -> AgentState:
             )
         )
         state["tool_results"] = tool_results
+        logger.info(f"after execute tools node tool results: {tool_results}")
         logger.info("도구 실행 완료")
     except Exception as e:
         logger.exception(f"도구 실행 중 오류: {e}")
