@@ -7,6 +7,7 @@ from starlette.websockets import WebSocket
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node import *
 from mcp_client.agent.node import detect_conversation_shift, direction_router
+from mcp_client.agent.node.medicine.find_medicine_details import find_medicine_details
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ def build_agent_graph():
     # 노드 추가
     graph.add_node("retrieve_context", retrieve_context)
     graph.add_node("detect_conversation_shift", detect_conversation_shift)
+    graph.add_node("find_medicine_details", find_medicine_details)
     graph.add_node("check_server_actions", check_server_actions)
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
@@ -43,9 +45,11 @@ def build_agent_graph():
             "check_server_actions": "check_server_actions",
             "load_tools": "load_tools",
             "save_conversation": "save_conversation",
+            "find_medicine_details": "find_medicine_details"
         }
     )
 
+    graph.add_edge("find_medicine_details", "save_conversation")
     graph.add_edge("check_server_actions", "save_conversation")
 
     graph.add_conditional_edges(
@@ -122,4 +126,5 @@ async def process_user_message(
         logger.error(f"그래프 구성 중 오류 발생: {str(e)}", exc_info=True)
         return "시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", None, None
 
+    logger.info(f"medeasy agent final_response: {state['final_response']}")
     return final_state["final_response"], final_state.get("client_action"), final_state.get("response_data")

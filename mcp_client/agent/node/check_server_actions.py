@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from mcp_client.agent.agent_send_message import agent_send_message
 from mcp_client.agent.medeasy_agent import AgentState
+from mcp_client.service.medicine_service import process_pill_image, format_medicine_search_results
 from mcp_client.service.routine_service import get_routine_list, register_routine_by_prescription, \
     format_prescription_for_voice, register_routine_list
 
@@ -21,15 +22,18 @@ async def check_server_actions(state: AgentState) -> AgentState:
     data = state.get("data")  # 이미지 바이트 또는 기타 데이터
 
     try:
+        # 오늘 복용 일정 확인
         if server_action == "GET_ROUTINE_LIST_TODAY":
             today = date.today()
             routine_result:str = await get_routine_list(today, today, jwt_token)
             state["final_response"] = routine_result
 
+        # 처방전 촬영 버튼
         elif server_action == "PRESCRIPTION_ROUTINE_REGISTER_REQUEST":
             state['final_response'] = "처방전 사진을 업로드하거나 카메라로 촬영해 주세요!"
             state['client_action'] = "CAPTURE_PRESCRIPTION"
 
+        # 사진 업로드
         elif server_action == "UPLOAD_PRESCRIPTION_PHOTO":
             if not data:
                 raise ValueError("업로드된 이미지 데이터가 없습니다.")
@@ -54,12 +58,43 @@ async def check_server_actions(state: AgentState) -> AgentState:
             state['response_data'] = prescription_response
             state['client_action'] = "REVIEW_PRESCRIPTION_REGISTER_RESPONSE"
 
+        # 루틴 리스트 등록
         elif server_action == "REGISTER_ROUTINE_LIST":
             message = "복약 일정 등록을 진행하고 있습니다. 잠시만 기다려주세요."
             await agent_send_message(state=state, message=message)
 
             state['final_response'] = await register_routine_list(jwt_token, data)
             state['client_action'] = None
+
+        elif server_action == "CAPTURE_PILLS_PHOTO_REQUEST":
+            state['final_response'] = "의약품 사진을 등록하거나 카메라로 촬영해 주세요!"
+            state['client_action'] = "CAPTURE_PILLS_PHOTO"
+
+        # 사진 업로드
+        elif server_action == "UPLOAD_PILLS_PHOTO":
+            if not data:
+                raise ValueError("업로드된 이미지 데이터가 없습니다.")
+
+            message = "업로드된 의약품 사진을 분석 중입니다. 잠시만 기다려 주세요."
+            await agent_send_message(state=state, message=message)
+
+            # 이미지 데이터 처리 (바이트 배열 또는 base64 인코딩 문자열 지원)
+            image_data = data
+            if isinstance(data, str):
+                # base64 인코딩된 문자열인 경우 디코딩
+                try:
+                    image_data = base64.b64decode(data)
+                    logger.info(f"Base64 디코딩 완료, 데이터 크기: {len(image_data)} 바이트")
+                except Exception as e:
+                    logger.warning(f"Base64 디코딩 실패, 원본 데이터 사용: {str(e)}")
+
+            pills_data, error_message = await process_pill_image(image_data)
+
+            # 응답 포맷팅 및 상태 저장
+            final_response = format_medicine_search_results(pills_data)
+            state["final_response"] = final_response
+            state['response_data'] = pills_data
+            state['client_action'] = "REVIEW_PILLS_PHOTO_SEARCH_RESPONSE"
 
 
     except HTTPException as e:

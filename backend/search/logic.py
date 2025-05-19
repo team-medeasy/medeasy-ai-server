@@ -3,6 +3,8 @@ import json
 from typing import Dict, Any, List
 import logging
 
+from fastapi import HTTPException
+
 from backend.utils.helpers import normalize_color, get_color_group, normalize_shape, get_shape_group
 from backend.search.transform import generate_character_variations
 
@@ -27,6 +29,34 @@ async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[st
     except Exception as e:
         logger.error(f"❌ Pill search failed: {e}", exc_info=True)
         return []
+
+async def search_medicine_by_item_seq(item_seq: str)-> Dict[str, Any]:
+    try:
+        query = {
+                    "term": {
+                        "item_seq": {
+                            "value": item_seq
+                        }
+                    }
+                }
+
+        result = await es.search(
+            index="medicine_data",
+            body={
+                "query": query,
+                "size": 1  # 단일 문서만 반환
+            }
+        )
+        hits = result.get("hits", {}).get("hits", [])
+        doc = hits[0]["_source"]
+
+        return doc
+    except Exception as e:
+        logger.error(f"의약품 검색 중 오류 발생: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="의약품 검색 중 오류가 발생했습니다."
+        )
 
 
 def preprocess_features(features: Dict[str, Any]) -> Dict[str, Any]:

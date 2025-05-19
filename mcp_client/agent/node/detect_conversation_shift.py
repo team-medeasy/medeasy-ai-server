@@ -120,8 +120,6 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                     # client_action 유지
                     state["direction"] = "save_conversation"
 
-
-
             elif "CANCEL" in intent: # -> save_conversation
                 # 등록 취소 의도 - 상태 초기화
                 state["final_response"] = "알겠습니다! 추가로 필요하신 일 있으시면 언제든 불러주세요!"
@@ -141,6 +139,58 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
             # 오류 발생 시 기본 응답
             state["final_response"] = "죄송합니다. 메시지를 처리하는 중에 오류가 발생했습니다. 다시 말씀해주시겠어요?"
             state["client_action"] = None
+
+
+    elif state["client_action"] == "REVIEW_PILLS_PHOTO_SEARCH_RESPONSE":
+        user_message = state.get("current_message", "")
+        medicines_data = state.get("response_data")
+
+        if not user_message:
+            # 메시지가 없는 경우 그대로 반환
+            return state
+
+        # GPT-Nano를 사용하여 사용자 의도 분류
+        classification_prompt = f"""
+           사용자의 메시지를 분석하여 의도를 분류해주세요. 다음 네 가지 중 하나로 분류하세요.
+           1. NOT_FOUND: 찾는 약이 없다는 의도 (예: "찾는 약이 없어요", "원하는 약이 목록에 없네요", "다른 약을 찾고 있어요")
+           2. DETAIL: 약에 대한 자세한 정보를 요청하는 의도 (예: "1번 약에 대해 자세히 알려줘", "첫 번째 약의 효능이 뭐야?", "세 번째 약 정보 더 알려줘")
+           3. REGISTER: 복용 일정을 등록하겠다는 의도 (예: "이 약 등록해줘", "2번 약 복용 일정에 추가해줘", "저녁에 먹을 약으로 설정해줘")
+           4. OTHER: 다른 요청이나 대화 주제 변경 (예: "고마워", "다른 질문이 있어", "메인으로 돌아가자")
+
+           사용자 메시지: {user_message}
+
+           분류 결과만 간단히 답변해주세요. (NOT_FOUND/DETAIL/REGISTER/OTHER)
+           """
+
+        try:
+            # GPT-Nano API 호출
+            intent_response = await gpt_nano.ainvoke(classification_prompt)
+            intent = intent_response.content.strip().upper()
+            logger.info(f"사용자 의도 감지: '{user_message}' -> {intent}")
+
+            if "NOT_FOUND" in intent:
+                # TODO 작성 필요
+                return state
+
+            elif "DETAIL" in intent:
+                state["direction"] = "find_medicine_details"
+
+            elif "REGISTER" in intent:
+                state["direction"] = "register_medicine"
+
+            else:  # "OTHER" 또는 기타 의도 -> load_tools
+                # 다른 요청 처리 - 상태 초기화 후 일반 대화 흐름으로 전환
+                state["final_response"] = None  # 응답은 초기화하고 다음 단계에서 생성
+                state["client_action"] = None
+                state["response_data"] = None
+                state["direction"] = "load_tools"
+
+        except Exception as e:
+            logger.error(f"사용자 의도 분석 중 오류 발생: {str(e)}", exc_info=True)
+            # 오류 발생 시 기본 응답
+            state["final_response"] = "죄송합니다. 메시지를 처리하는 중에 오류가 발생했습니다. 다시 말씀해주시겠어요?"
+            state["client_action"] = None
+
 
     return state
 
@@ -331,6 +381,8 @@ def direction_router(state: AgentState) -> str:
         return "load_tools"
     elif direction == "save_conversation":
         return "save_conversation"
+    elif direction == "find_medicine_details":
+        return "find_medicine_details"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "load_tools"
