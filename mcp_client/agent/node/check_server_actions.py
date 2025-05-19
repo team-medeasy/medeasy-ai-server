@@ -90,7 +90,6 @@ async def check_server_actions(state: AgentState) -> AgentState:
 
             pills_data, error_message = await process_pill_image(image_data)
 
-
             # 응답 포맷팅 및 상태 저장
             final_response = format_medicine_search_results(pills_data)
             state["final_response"] = final_response

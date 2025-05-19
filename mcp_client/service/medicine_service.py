@@ -73,9 +73,10 @@ async def process_pill_image(image_data: bytes) -> Tuple[List[Dict[str, Any]], O
                             "print_front": medicine_data.get("print_front", ""),
                             "print_back": medicine_data.get("print_back", ""),
                             "class_name": medicine_data.get("class_name", "알 수 없음"),
-                            "efcy_qesitm": medicine_data.get("efcy_qesitm", "정보 없음"),  # 효능
-                            "use_method_qesitm": medicine_data.get("use_method_qesitm", "정보 없음"),  # 용법
-                            "atpn_warn_qesitm": medicine_data.get("atpn_warn_qesitm", "정보 없음"),  # 주의사항
+                            "indications": medicine_data.get("indications", "정보 없음"),  # 효능
+                            "dosage": medicine_data.get("dosage", "정보 없음"),  # 용법
+                            "precautions": medicine_data.get("precautions", "정보 없음"),  # 주의사항
+                            "side_effects" : medicine_data.get("side_effects", "정보 없음"),
                             "image_url": medicine_data.get("item_image", "")
                         }
                         medicines_found.append(medicine_info)
@@ -88,9 +89,6 @@ async def process_pill_image(image_data: bytes) -> Tuple[List[Dict[str, Any]], O
             return [], "사진에서 의약품을 식별할 수 없습니다. 다른 사진을 시도해 주세요."
 
         logger.info( f"사진에서 {len(medicines_found)}개의 의약품을 식별했습니다.")
-
-        for medicine in medicines_found:
-            medicine["action"] = "REVIEW_PILL_IDENTIFICATION_RESULT"
 
         return medicines_found, None
 
