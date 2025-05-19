@@ -309,7 +309,7 @@ async def _generate_final_response(
         return llm_response.content
     except Exception as e:
         logger.exception("Failed to generate final response: %s", e)
-        return json.dumps({"tool_results": tool_results, "error": str(e)})
+        return "죄송합니다. 요청을 처리하던 중 오류가 발생하였습니다. 나중에 다시 시도해주세요."
 
 
 # 채팅 이력을 포맷팅하는 함수
