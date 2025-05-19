@@ -122,14 +122,14 @@ def format_medicine_search_results(medicines: List[Dict[str, Any]]) -> str:
         return "검색된 의약품이 없습니다. 다른 사진으로 다시 시도해 주세요."
 
     # 헤더 메시지
-    lines = ["의약품 검색 결과입니다.", "제약회사, 약 이름, 모양, 색상, 마크 내용들입니다."]
+    lines = ["의약품 사진 검색 결과입니다."]
 
     # 각 의약품 정보 추가
     for idx, med in enumerate(medicines, 1):
-        entp_name = med.get("entp_name", "알 수 없는 제조사")
-        item_name = med.get("item_name", "알 수 없는 약품")
-        drug_shape = med.get("drug_shape", "정보 없음")
-        color = med.get("color_class1", "정보 없음")
+        class_name = med.get("class_name", "")
+        item_name = med.get("item_name", "")
+        drug_shape = med.get("drug_shape", "")
+        chart = med.get("chart", "")
 
         # 마크 정보 구성
         mark_info = []
@@ -141,14 +141,15 @@ def format_medicine_search_results(medicines: List[Dict[str, Any]]) -> str:
         if back_print and back_print != front_print:
             mark_info.append(f"뒷면 '{back_print}'")
 
-        mark_text = ", ".join(mark_info) if mark_info else "마크 없음"
+        mark_text = ", ".join(mark_info) if mark_info else ""
 
         # 의약품 정보 한 줄로 구성
-        med_info = f"{idx}. {entp_name}, {item_name}, {drug_shape}형, {color}색, {mark_text}"
+        med_info = f"{idx}. {class_name}, {item_name}, {drug_shape}, {chart}, {mark_text}"
         lines.append(med_info)
 
     # 질문 추가
     lines.append("")  # 빈 줄 추가
     lines.append("이중 찾으시는 의약품이 있으신가요?")
+    lines.append("의약품 정보를 자세히 알려드리거나, 복용 일정을 등록해드릴게요!")
 
     return "\n".join(lines)
