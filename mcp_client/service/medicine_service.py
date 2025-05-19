@@ -67,7 +67,7 @@ async def process_pill_image(image_data: bytes) -> Tuple[List[Dict[str, Any]], O
                             "entp_name": medicine_data.get("entp_name", "알 수 없음"),
                             "chart": medicine_data.get("chart", "알 수 없음"),
                             "drug_shape": medicine_data.get("drug_shape", "알 수 없음"),
-                            "color_class1": medicine_data.get("color_class1", "알 수 없음"),
+                            "color_classes": medicine_data.get("color_classes", "알 수 없음"),
                             "line_front": medicine_data.get("line_front", ""),
                             "line_back": medicine_data.get("line_back", ""),
                             "print_front": medicine_data.get("print_front", ""),

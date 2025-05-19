@@ -9,7 +9,7 @@ from mcp_client.agent.agent_send_message import agent_send_message
 from mcp_client.agent.medeasy_agent import AgentState
 from mcp_client.service.medicine_service import process_pill_image, format_medicine_search_results
 from mcp_client.service.routine_service import get_routine_list, register_routine_by_prescription, \
-    format_prescription_for_voice, register_routine_list
+    format_prescription_for_voice
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ async def check_server_actions(state: AgentState) -> AgentState:
             message = "복약 일정 등록을 진행하고 있습니다. 잠시만 기다려주세요."
             await agent_send_message(state=state, message=message)
 
-            state['final_response'] = await register_routine_list(jwt_token, data)
             state['client_action'] = None
+            state['direction'] = "register_routine_list"
 
         elif server_action == "CAPTURE_PILLS_PHOTO_REQUEST":
             state['final_response'] = "의약품 사진을 등록하거나 카메라로 촬영해 주세요!"
@@ -105,3 +105,37 @@ async def check_server_actions(state: AgentState) -> AgentState:
         state["error"] = f"서버 액션 처리 오류: {str(e)}"
 
     return state
+
+
+def check_server_actions_direction_router(state: AgentState) -> str:
+    """
+    AgentState의 direction 값에 따라 다음 실행할 노드를 결정하는 엣지 함수
+
+    Args:
+        state: 현재 에이전트 상태
+
+    Returns:
+        str: 다음 실행할 노드 이름
+    """
+    # direction 값 확인 (없으면 기본값으로 'save_conversation' 사용)
+    direction = state.get("direction")
+
+    # direction 로깅
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"대화 흐름 방향 결정: direction={direction}")
+
+    # 방향에 따른 노드 결정
+    if direction == "check_server_actions":
+        return "check_server_actions"
+    elif direction == "load_tools":
+        return "load_tools"
+    elif direction == "save_conversation":
+        return "save_conversation"
+    elif direction == "find_medicine_details":
+        return "find_medicine_details"
+    elif direction == "register_routine_list":
+        return "register_routine_list"
+    else:
+        # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
+        return "save_conversation"

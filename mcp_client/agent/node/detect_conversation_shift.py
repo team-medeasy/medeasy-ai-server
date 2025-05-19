@@ -155,7 +155,7 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
            1. NOT_FOUND: 찾는 약이 없다는 의도 (예: "찾는 약이 없어요", "원하는 약이 목록에 없네요", "다른 약을 찾고 있어요")
            2. DETAIL: 약에 대한 자세한 정보를 요청하는 의도 (예: "1번 약에 대해 자세히 알려줘", "첫 번째 약의 효능이 뭐야?", "세 번째 약 정보 더 알려줘")
            3. REGISTER: 복용 일정을 등록하겠다는 의도 (예: "이 약 등록해줘", "2번 약 복용 일정에 추가해줘", "저녁에 먹을 약으로 설정해줘")
-           4. OTHER: 다른 요청이나 대화 주제 변경 (예: "고마워", "다른 질문이 있어", "메인으로 돌아가자")
+           4. OTHER: 다른 요청이나 대화 주제 변경 (예: "고마워", "다른 질문이 있어", "메인으로 돌아가자", "오늘 복약 일정을 알려줘")
 
            사용자 메시지: {user_message}
 
@@ -169,10 +169,12 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
             logger.info(f"사용자 의도 감지: '{user_message}' -> {intent}")
 
             if "NOT_FOUND" in intent:
-                # TODO 작성 필요
+                state["direction"] = "save_conversation"
+                state['final_response'] = "죄송합니다. 찾는 약이 없으시군요. 의약품을 밝은 곳에서 다시 촬영해주시면 한번 더 약을 찾아드릴게요."
+                state["client_action"] = "UPLOAD_PILLS_PHOTO"
                 return state
 
-            elif "DETAIL" in intent:
+            elif "DETAIL" in intent: # 의약품 상제 정보를 얻고 싶을 때
                 state["direction"] = "find_medicine_details"
 
             elif "REGISTER" in intent:
@@ -184,6 +186,10 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                 state["client_action"] = None
                 state["response_data"] = None
                 state["direction"] = "load_tools"
+
+                # state["tool_calls"] = []
+                # state["tool_results"] = []
+                # state["initial_response"] = None
 
         except Exception as e:
             logger.error(f"사용자 의도 분석 중 오류 발생: {str(e)}", exc_info=True)
