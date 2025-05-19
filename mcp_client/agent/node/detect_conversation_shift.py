@@ -169,10 +169,12 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
             logger.info(f"사용자 의도 감지: '{user_message}' -> {intent}")
 
             if "NOT_FOUND" in intent:
-                # TODO 작성 필요
+                state["direction"] = "save_conversation"
+                state['final_response'] = "죄송합니다. 찾는 약이 없으시군요. 의약품을 밝은 곳에서 다시 촬영해주시면 한번 더 약을 찾아드릴게요."
+                state["client_action"] = "UPLOAD_PILLS_PHOTO"
                 return state
 
-            elif "DETAIL" in intent:
+            elif "DETAIL" in intent: # 의약품 상제 정보를 얻고 싶을 때
                 state["direction"] = "find_medicine_details"
 
             elif "REGISTER" in intent:

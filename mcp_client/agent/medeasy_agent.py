@@ -7,7 +7,9 @@ from starlette.websockets import WebSocket
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node import *
 from mcp_client.agent.node import detect_conversation_shift, direction_router
+from mcp_client.agent.node.check_server_actions import check_server_actions_direction_router
 from mcp_client.agent.node.medicine.find_medicine_details import find_medicine_details
+from mcp_client.agent.node.routine.register_routine_list import register_routine_list
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +23,14 @@ def build_agent_graph():
     graph.add_node("detect_conversation_shift", detect_conversation_shift)
     graph.add_node("find_medicine_details", find_medicine_details)
     graph.add_node("check_server_actions", check_server_actions)
+    graph.add_node("register_routine_list", register_routine_list)
+
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
     graph.add_node("check_client_actions", check_client_actions)
     graph.add_node("execute_tools", execute_tools)
     graph.add_node("generate_final_response", generate_final_response)
+
     graph.add_node("save_conversation", save_conversation)
 
     # 엣지 연결
@@ -50,7 +55,14 @@ def build_agent_graph():
     )
 
     graph.add_edge("find_medicine_details", "save_conversation")
-    graph.add_edge("check_server_actions", "save_conversation")
+    graph.add_conditional_edges(
+        "check_server_actions",
+        check_server_actions_direction_router,
+        {
+            "register_routine_list": "register_routine_list",
+            "save_conversation": "save_conversation",
+        }
+    )
 
     graph.add_conditional_edges(
         "load_tools",
