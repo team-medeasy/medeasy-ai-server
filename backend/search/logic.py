@@ -103,16 +103,16 @@ def build_es_query(norm: Dict[str, Any], top_k: int) -> Dict[str, Any]:
     Elasticsearch 쿼리문을 구성합니다.
     - 필터(모양/색상 그룹)와
     - should 절(인쇄문자, 마크 코드, 유사 문자 변형)을 포함하여 쿼리를 만듭니다.
-    - 투명 색상 의약품은 색상 필터 무시하고 검색에 포함시킵니다.
+    - 투명 색상 의약품은 색상 필터와 관계없이 shape_group과 imprint가 일치하면 결과에 포함시킵니다.
     """
     should_clauses = []
     filter_clauses = []
 
     # 1. 모양 그룹 필터
-    shape_filter = None
+    shape_group_filter = None
     if "shape_group" in norm:
-        shape_filter = {"term": {"shape_group": norm["shape_group"]}}
-        filter_clauses.append(shape_filter)
+        shape_group_filter = {"term": {"shape_group": norm["shape_group"]}}
+        filter_clauses.append(shape_group_filter)
     
     # 2. 색상 그룹 필터
     color_filter = None
@@ -212,15 +212,18 @@ def build_es_query(norm: Dict[str, Any], top_k: int) -> Dict[str, Any]:
 
     # 4. 투명 색상 약품을 위한 추가 쿼리 (색상 필터 무시)
     transparent_query = None
-    if shape_filter and imprint_clauses and color_filter:  # 모든 필터가 존재할 때만 추가
+    if imprint_clauses:  # imprint가 있으면 투명 색상에 대한 예외 처리 추가
+        transparent_must = [{"term": {"color_group": "투명"}}]
+        
+        # shape_group 필터가 있다면 포함
+        if shape_group_filter:
+            transparent_must.append(shape_group_filter)
+            
         transparent_query = {
             "bool": {
-                "must": [
-                    {"term": {"color_group": "투명"}},
-                    shape_filter  # 모양 필터는 유지
-                ],
-                "should": imprint_clauses,  # imprint 검색 조건 적용
-                "minimum_should_match": 1 if imprint_clauses else 0
+                "must": transparent_must,
+                "should": imprint_clauses,
+                "minimum_should_match": 1  # 적어도 하나의 imprint 조건 일치 필요
             }
         }
 
