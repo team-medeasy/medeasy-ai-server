@@ -101,24 +101,22 @@ def preprocess_features(features: Dict[str, Any]) -> Dict[str, Any]:
 def build_es_query(norm: Dict[str, Any], top_k: int) -> Dict[str, Any]:
     """
     Elasticsearch 쿼리문을 구성합니다.
-    - 필터(모양/색상 그룹)와
-    - should 절(인쇄문자, 마크 코드, 유사 문자 변형)을 포함하여 쿼리를 만듭니다.
-    - 투명 색상 의약품은 색상 필터와 관계없이 shape_group과 imprint가 일치하면 결과에 포함시킵니다.
+    - 일반 쿼리: 모양, 색상, 인쇄문자 모두 검색
+    - 투명 예외 쿼리: 투명 색상 의약품은 shape_group과 imprint가 일치하면 검색에 포함
     """
     should_clauses = []
     filter_clauses = []
+    shape_group_filter = None
 
     # 1. 모양 그룹 필터
-    shape_group_filter = None
     if "shape_group" in norm:
         shape_group_filter = {"term": {"shape_group": norm["shape_group"]}}
         filter_clauses.append(shape_group_filter)
     
     # 2. 색상 그룹 필터
-    color_filter = None
     if "primary_color_group" in norm:
         if "secondary_color_group" in norm:
-            color_filter = {
+            filter_clauses.append({
                 "bool": {
                     "should": [
                         {"term": {"color_group": norm["primary_color_group"]}},
@@ -126,143 +124,146 @@ def build_es_query(norm: Dict[str, Any], top_k: int) -> Dict[str, Any]:
                     ],
                     "minimum_should_match": 1
                 }
-            }
+            })
         else:
-            color_filter = {
+            filter_clauses.append({
                 "term": {"color_group": norm["primary_color_group"]}
-            }
-        filter_clauses.append(color_filter)
+            })
 
     # 3. 인쇄문자 및 마크 코드 관련 쿼리
     imprint = norm.get("imprint", "")
     is_mark = norm.get("is_mark", False)
-    imprint_clauses = []  # imprint 검색 조건 저장
     
     if imprint:
         # 정확한 일치: keyword 필드를 사용
-        imprint_clauses.append({
+        should_clauses.append({
             "term": {
                 "print_front.keyword": {"value": imprint, "boost": 10.0}
             }
         })
-        imprint_clauses.append({
+        should_clauses.append({
             "term": {
                 "print_back.keyword": {"value": imprint, "boost": 10.0}
             }
         })
         # 퍼지 매칭: fuzzy 옵션 활용
-        imprint_clauses.append({
+        should_clauses.append({
             "match": {
                 "print_front": {"query": imprint, "boost": 5.0, "fuzziness": "AUTO"}
             }
         })
-        imprint_clauses.append({
+        should_clauses.append({
             "match": {
                 "print_back": {"query": imprint, "boost": 5.0, "fuzziness": "AUTO"}
             }
         })
         # 마크 코드 검색
         if is_mark:
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_front_anal": {"query": imprint, "boost": 8.0}
                 }
             })
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_back_anal": {"query": imprint, "boost": 8.0}
                 }
             })
         else:
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_front_anal": {"query": imprint, "boost": 4.0}
                 }
             })
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_back_anal": {"query": imprint, "boost": 4.0}
                 }
             })
         # 유사 문자 변형에 따른 검색
         for variation in norm.get("imprint_variations", []):
-            imprint_clauses.append({
+            should_clauses.append({
                 "term": {
                     "print_front.keyword": {"value": variation, "boost": 8.0 if is_mark else 5.0}
                 }
             })
-            imprint_clauses.append({
+            should_clauses.append({
                 "term": {
                     "print_back.keyword": {"value": variation, "boost": 8.0 if is_mark else 5.0}
                 }
             })
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_front_anal": {"query": variation, "boost": 6.0 if is_mark else 3.0}
                 }
             })
-            imprint_clauses.append({
+            should_clauses.append({
                 "match": {
                     "mark_code_back_anal": {"query": variation, "boost": 6.0 if is_mark else 3.0}
                 }
             })
-        
-        # should_clauses에 imprint 검색 조건 추가
-        should_clauses.extend(imprint_clauses)
 
-    # 4. 투명 색상 약품을 위한 추가 쿼리 (색상 필터 무시)
+    # 4. 최종 쿼리 구성: 두 개의 독립적인 쿼리를 OR로 결합
+    main_query = {
+        "bool": {
+            "filter": filter_clauses,
+            "should": should_clauses,
+            "minimum_should_match": 1 if should_clauses else 0
+        }
+    }
+    
+    # 투명 색상 쿼리: shape_group과 imprint가 일치하면 결과에 포함
     transparent_query = None
-    if imprint_clauses:  # imprint가 있으면 투명 색상에 대한 예외 처리 추가
-        transparent_must = [{"term": {"color_group": "투명"}}]
+    if imprint and shape_group_filter:  # imprint와 shape_group이 모두 있을 때만 투명 쿼리 추가
+        transparent_should = []
         
-        # shape_group 필터가 있다면 포함
-        if shape_group_filter:
-            transparent_must.append(shape_group_filter)
-            
+        # 동일한 imprint 검색 조건
+        transparent_should.append({
+            "term": {"print_front.keyword": {"value": imprint, "boost": 10.0}}
+        })
+        transparent_should.append({
+            "term": {"print_back.keyword": {"value": imprint, "boost": 10.0}}
+        })
+        transparent_should.append({
+            "match": {"print_front": {"query": imprint, "boost": 5.0, "fuzziness": "AUTO"}}
+        })
+        transparent_should.append({
+            "match": {"print_back": {"query": imprint, "boost": 5.0, "fuzziness": "AUTO"}}
+        })
+        
+        # 유사 문자 변형도 포함
+        for variation in norm.get("imprint_variations", []):
+            transparent_should.append({
+                "term": {"print_front.keyword": {"value": variation, "boost": 5.0}}
+            })
+            transparent_should.append({
+                "term": {"print_back.keyword": {"value": variation, "boost": 5.0}}
+            })
+        
         transparent_query = {
             "bool": {
-                "must": transparent_must,
-                "should": imprint_clauses,
-                "minimum_should_match": 1  # 적어도 하나의 imprint 조건 일치 필요
+                "must": [
+                    {"term": {"color_group": "투명"}},  # 색상이 투명인 항목
+                    shape_group_filter  # shape_group 필터 추가
+                ],
+                "should": transparent_should,
+                "minimum_should_match": 1  # 최소 하나의 imprint 조건 일치
             }
         }
-
-    # 최종 쿼리 구성
-    if transparent_query:
-        # 투명 색상 예외 처리가 있는 경우
-        query_body = {
-            "size": top_k,
-            "query": {
-                "bool": {
-                    "should": [
-                        # 일반 검색 조건
-                        {
-                            "bool": {
-                                "filter": filter_clauses,
-                                "should": should_clauses,
-                                "minimum_should_match": 1 if should_clauses else 0
-                            }
-                        },
-                        # 투명 색상 예외 처리
-                        transparent_query
-                    ],
-                    "minimum_should_match": 1
-                }
-            },
-            "sort": [{"_score": {"order": "desc"}}]
-        }
-    else:
-        # 기존 쿼리 그대로 사용
-        query_body = {
-            "size": top_k,
-            "query": {
-                "bool": {
-                    "filter": filter_clauses,
-                    "should": should_clauses,
-                    "minimum_should_match": 1 if should_clauses else 0
-                }
-            },
-            "sort": [{"_score": {"order": "desc"}}]
-        }
+    
+    # 두 쿼리를 OR로 결합
+    query_body = {
+        "size": top_k,
+        "query": {
+            "bool": {
+                "should": [
+                    main_query,  # 일반 검색 쿼리
+                    transparent_query if transparent_query else {"match_none": {}}  # 투명 예외 쿼리 (없으면 match_none)
+                ],
+                "minimum_should_match": 1
+            }
+        },
+        "sort": [{"_score": {"order": "desc"}}]
+    }
     
     return query_body
