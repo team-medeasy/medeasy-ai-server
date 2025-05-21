@@ -179,6 +179,7 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                 state["direction"] = "find_medicine_details"
 
             elif "REGISTER" in intent:
+                #TODO register 구현 필요 register routine list 노드 활용하면 좋을텐데 routine_list 등록에 필요한 정보를 다 모으는 것이 목적
                 state["direction"] = "register_medicine"
 
             else:  # "OTHER" 또는 기타 의도 -> load_tools

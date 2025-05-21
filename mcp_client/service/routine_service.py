@@ -194,7 +194,7 @@ async def register_routine_by_prescription(jwt_token: str, image_data: bytes) ->
 
 def format_prescription_for_voice(prescriptions: List[Dict[str, Any]]) -> str:
     """
-    처방전 데이터를 음성 안내용 텍스트로 요약
+    처방전 데이터를 간결한 음성 안내용 텍스트로 요약
 
     Args:
         prescriptions: 처방전 정보 목록
@@ -205,63 +205,28 @@ def format_prescription_for_voice(prescriptions: List[Dict[str, Any]]) -> str:
     if not prescriptions:
         return "처방전 분석 결과, 등록된 약품이 없습니다. 다른 처방전을 시도하거나 수동으로 등록해 주세요."
 
-    # 약품 수 계산
-    med_count = len(prescriptions)
-
-    # 처방 일수 (모든 약이 같은 기간이라고 가정)
-    days = prescriptions[0].get("total_days", 0) if prescriptions else 0
-
-    # 공통 복용 시간 파악
-    all_schedules = set()
-    recommended_schedules = set()
-
-    for prescription in prescriptions:
-        for schedule in prescription.get("user_schedules", []):
-            schedule_name = schedule.get("name", "")
-            all_schedules.add(schedule_name)
-
-            if schedule.get("recommended", False):
-                recommended_schedules.add(schedule_name)
-
-    # 주요 약품 정보 추출 (최대 2개까지만 상세히 언급)
-    detailed_meds = []
-    for i, med in enumerate(prescriptions[:2]):
+    # 의약품 이름 목록 추출
+    med_names = []
+    for med in prescriptions:
         med_name = med.get("medicine_name", "")
-        # 약품명이 너무 길면 앞부분만 사용
-        if len(med_name) > 30:
-            # 첫 번째 괄호 위치 찾기
-            paren_idx = med_name.find('(')
-            if paren_idx > 0:
-                med_name = med_name[:paren_idx].strip()
-            else:
-                med_name = med_name[:30].strip()
 
-        class_name = med.get("class_name", "")
-        dose = med.get("dose", 1)
+        # 괄호가 있으면 괄호 앞부분만 사용
+        paren_idx = med_name.find('(')
+        if paren_idx > 0:
+            med_name = med_name[:paren_idx].strip()
 
-        # 약품 타입 (일반/전문)
-        med_type = "일반의약품" if med.get("etc_otc_name") == "일반의약품" else "전문의약품"
+        # 약품 이름이 있는 경우에만 추가
+        if med_name:
+            med_names.append(med_name)
 
-        detailed_meds.append(f"{med_name} {dose}정({class_name}, {med_type})")
+    # 약품 이름 목록을 문자열로 결합
+    med_names_str = ", ".join(med_names)
 
-    # 나머지 약품이 있으면 개수만 언급
-    remaining = med_count - len(detailed_meds)
-    if remaining > 0:
-        detailed_meds.append(f"그 외 {remaining}개 약품")
-
-    # 음성 메시지 구성
-    lines = []
-    lines.append(f"처방전 분석이 완료되었습니다. 총 {med_count}개 약품이 {days}일분 처방되었습니다.")
-
-    # 약품 정보
-    lines.append("처방된 약품은 " + ", ".join(detailed_meds) + "입니다.")
-
-    # 복용 시간 안내
-    if recommended_schedules:
-        schedule_text = ", ".join(sorted(recommended_schedules))
-        lines.append(f"권장 복용 시간은 {schedule_text}입니다.")
-
-    # 마무리 문구
-    lines.append("분석 정보가 정확한지 확인해주시고, 복용 일정 등록을 요청해주세요!")
+    # 메시지 구성
+    lines = [
+        "처방전 분석이 완료되었습니다.",
+        f"등록할 의약품이 {med_names_str} 맞으신가요?",
+        "분석 정보가 정확한지 확인해주시고, 복용 일정 등록을 요청해주세요!"
+    ]
 
     return " ".join(lines)
