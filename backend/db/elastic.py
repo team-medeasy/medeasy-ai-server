@@ -12,7 +12,7 @@ load_dotenv()
 ELASTICSEARCH_HOST = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
 ELASTICSEARCH_PORT = os.getenv("ELASTICSEARCH_PORT", "9200")
 ELASTICSEARCH_URL = f"http://{ELASTICSEARCH_HOST}:{ELASTICSEARCH_PORT}"
-INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX", "pills_v6")
+INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX", "pills_v5")
 
 ELASTIC_USER = os.getenv("ELASTIC_USER", "elastic")
 ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD", "your_password")

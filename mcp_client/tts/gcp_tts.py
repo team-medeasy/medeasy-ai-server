@@ -17,12 +17,10 @@ async def convert_text_to_speech(request: str):
         logger.info(f"Converting {request}")
         # dict 형태로 요청 생성
         request_dict = {
-            "input": {
-                "text": request
-            },
+            "input": {"text": request},
             "voice": {
                 "language_code": "ko-KR",
-                "ssml_gender": texttospeech_v1beta1.SsmlVoiceGender.MALE
+                "name": "ko-KR-Chirp3-HD-Achernar"  # Chirp 3 HD 음성
             },
             "audio_config": {
                 "audio_encoding": texttospeech_v1beta1.AudioEncoding.MP3
