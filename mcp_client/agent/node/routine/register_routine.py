@@ -7,6 +7,7 @@ from mcp_client.agent.agent_types import AgentState
 from mcp_client.client import final_response_llm
 from mcp_client.prompt import system_prompt
 from mcp_client.service.medicine_service import search_medicines_by_name
+from mcp_client.service.schedule_service import get_user_schedules_info
 
 logger = logging.getLogger(__name__)
 
@@ -114,13 +115,18 @@ async def register_routine(state: AgentState)->AgentState:
             2. names와 매칭되는 스케줄 ids 추출 
             3. ids 저장
         """
-
+        schedules = await get_user_schedules_info(jwt_token)
+        state["response_data"] = schedules
+        state["direction"] = "save_conversation"
 
     if not parsed_data.get("user_schedule_names"):
         """
             1. 사용자의 스케줄 리스트를 추출
             2. 이 시간 중 약을 언제 드시고 싶으신가요??
         """
+        schedules = await get_user_schedules_info(jwt_token)
+        state["response_data"] = schedules
+        state["final_response"] =
 
 
     if not parsed_data.get("dose"):

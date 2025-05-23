@@ -74,7 +74,9 @@ async def find_routine_register_medicine(state: AgentState)->AgentState:
                 state["client_action"] = "register_routine"
                 state["direction"] = "routine_register"
             else:
-                state["final_response"] = "선택하신 의약품 정보를 찾을 수 없습니다."
+                state["final_response"] = "선택하신 의약품 정보를 찾을 수 없습니다. 나중에 다시 시도해주세요."
+                state["client_action"] = None
+                state["direction"] = "save_conversation"
         else:
             # 선택되지 않은 경우
             medicine_list = format_medicine_list_for_user(medicines)
