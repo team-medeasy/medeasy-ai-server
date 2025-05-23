@@ -44,6 +44,7 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
     Returns:
         업데이트된 에이전트 상태
     """
+    logger.info("execute detect_conversation_shift node")
     # 처방전 등록 응답 검토 단계인 경우 - 사용자의 의도 파악
     if state.get("client_action") == "REVIEW_PRESCRIPTION_REGISTER_RESPONSE":
         user_message = state.get("current_message", "")
@@ -200,6 +201,11 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
             state["client_action"] = None
 
 
+    elif state["client_action"] == "REGISTER_ROUTINE":
+        state["direction"] = "register_routine"
+
+    elif state["client_action"] == "REGISTER_ROUTINE_SEARCH_MEDICINE":
+        state["direction"] = "find_routine_register_medicine"
     return state
 
 
@@ -391,6 +397,10 @@ def direction_router(state: AgentState) -> str:
         return "save_conversation"
     elif direction == "find_medicine_details":
         return "find_medicine_details"
+    elif direction == "register_routine":
+        return "register_routine"
+    elif direction == "find_routine_register_medicine":
+        return "find_routine_register_medicine"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "load_tools"
