@@ -4,10 +4,12 @@ import logging
 from typing import Optional, Dict, Any
 
 from mcp_client.agent.agent_types import AgentState
+from mcp_client.agent.node.schedule.match_user_schedule import format_schedules_for_user
 from mcp_client.client import final_response_llm
 from mcp_client.prompt import system_prompt
 from mcp_client.service.medicine_service import search_medicines_by_name
 from mcp_client.service.schedule_service import get_user_schedules_info
+from mcp_client.service.user_service import get_user_info
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +111,7 @@ async def register_routine(state: AgentState)->AgentState:
 
         return state
 
+    # 스케줄 관련 값 검사
     if parsed_data.get("user_schedule_names"):
         """
             1. 사용자의 스케줄 리스트를 추출 schedule_service 파일에 메소드 하나 추가 
@@ -117,7 +120,7 @@ async def register_routine(state: AgentState)->AgentState:
         """
         schedules = await get_user_schedules_info(jwt_token)
         state["response_data"] = schedules
-        state["direction"] = "save_conversation"
+        state["direction"] = "register_routine"
 
     if not parsed_data.get("user_schedule_names"):
         """
@@ -125,9 +128,13 @@ async def register_routine(state: AgentState)->AgentState:
             2. 이 시간 중 약을 언제 드시고 싶으신가요??
         """
         schedules = await get_user_schedules_info(jwt_token)
+        user = await get_user_info(state["jwt_token"])
         state["response_data"] = schedules
-        state["final_response"] =
-
+        state["final_response"] = f"""
+            다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
+            \n\n{format_schedules_for_user(schedules)}\n\n
+        """
+        state["direction"] = "register_routine"
 
     if not parsed_data.get("dose"):
         state["final_response"] = "복용하실 의약품의 1회 복용량을 알려주세요!"
