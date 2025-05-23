@@ -20,7 +20,7 @@ async def convert_text_to_speech(request: str):
             "input": {"text": request},
             "voice": {
                 "language_code": "ko-KR",
-                "name": "ko-KR-Chirp3-HD-Achernar"  # Chirp 3 HD 음성
+                "ssml_gender": texttospeech_v1beta1.SsmlVoiceGender.MALE
             },
             "audio_config": {
                 "audio_encoding": texttospeech_v1beta1.AudioEncoding.MP3
@@ -28,6 +28,7 @@ async def convert_text_to_speech(request: str):
         }
 
         response = await client.synthesize_speech(request=request_dict)
+        logger.info("finished converting text")
         return response.audio_content
 
     except Exception as e:
