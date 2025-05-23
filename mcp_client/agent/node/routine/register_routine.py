@@ -108,15 +108,32 @@ async def register_routine(state: AgentState)->AgentState:
 
         return state
 
+    if parsed_data.get("user_schedule_names"):
+        """
+            1. 사용자의 스케줄 리스트를 추출 schedule_service 파일에 메소드 하나 추가 
+            2. names와 매칭되는 스케줄 ids 추출 
+            3. ids 저장
+        """
 
-    # TODO 복용량 총 복용 개수 없는 경우 질의
+
+    if not parsed_data.get("user_schedule_names"):
+        """
+            1. 사용자의 스케줄 리스트를 추출
+            2. 이 시간 중 약을 언제 드시고 싶으신가요??
+        """
+
+
     if not parsed_data.get("dose"):
+        state["final_response"] = "복용하실 의약품의 1회 복용량을 알려주세요!"
+        state["client_action"] = "REGISTER_ROUTINE"
+        state["direction"] = "save_conversation"
         return state
+
     if not parsed_data.get("total_quantity"):
+        state["final_response"] = "복용하실 의약품의 총 개수를 알려주세요!"
+        state["client_action"] = "REGISTER_ROUTINE"
+        state["direction"] = "save_conversation"
         return state
-
-
-
 
     return state
 

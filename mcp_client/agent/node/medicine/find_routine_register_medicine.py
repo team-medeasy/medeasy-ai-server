@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Dict, List
 
+from mcp_client.agent.agent_send_message import agent_send_message
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.client import final_response_llm
 
@@ -67,7 +68,9 @@ async def find_routine_register_medicine(state: AgentState)->AgentState:
 
                 logger.info(f"약을 선택한 이유: {selected_medicine.get('reason')}, 선택 정확도: {selected_medicine.get('confidence')}")
 
-                state["final_response"] = f"'{selected_medicine_info.get('item_name')}'이 선택되었습니다."
+                agent_message = f"'{selected_medicine_info.get('item_name')}'이 선택되었습니다."
+                await agent_send_message(state, agent_message)
+
                 state["client_action"] = "register_routine"
                 state["direction"] = "routine_register"
             else:
