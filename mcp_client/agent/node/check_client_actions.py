@@ -10,18 +10,26 @@ async def check_client_actions(state: AgentState) -> AgentState:
         if name == 'register_routine_by_prescription':
             state["client_action"] = "CAPTURE_PRESCRIPTION"
             state["final_response"] = "가지고 계신 처방전을 촬영해주세요."
-            break
+
         elif name == 'register_routine_by_pills_photo':
             state["client_action"] = "CAPTURE_PILLS_PHOTO"
             state["final_response"] = "알약 사진을 촬영해주세요."
-            break
+
+        elif name == 'router_routine_register_node':
+            state["client_action"] = "REGISTER_ROUTINE"
+            state['direction'] = 'register_routine'
 
     return state
 
-def has_capture_request(state: AgentState) -> str:
-    """캡처 요청이 있는지 확인"""
-    return (
-        "capture"
-        if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]
-        else "continue"
-    )
+def check_client_actions_direction_router(state: AgentState) -> str:
+
+    # 캡처 요청이 있는 경우
+    if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]:
+        return "capture"
+
+    # 루틴 등록 도구가 호출된 경우
+    elif state.get("direction") == "register_routine":
+        return "register_routine"
+
+    else:
+        return "execute_tools"

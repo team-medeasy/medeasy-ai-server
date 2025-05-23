@@ -17,13 +17,17 @@ async def check_server_actions(state: AgentState) -> AgentState:
     """
     서버에서 바로 다이렉트로 기능 수행할 점이 있는지 ai 도구 선택이 필요 없는 경우
     """
+    logger.info("execute check server actions node")
     server_action: str=state.get("server_action")
     jwt_token: str = state.get("jwt_token")
     data = state.get("data")  # 이미지 바이트 또는 기타 데이터
 
     try:
+        if server_action == "REGISTER_ROUTINE_REQUEST":
+            state['direction'] = 'register_routine'
+
         # 오늘 복용 일정 확인
-        if server_action == "GET_ROUTINE_LIST_TODAY":
+        elif server_action == "GET_ROUTINE_LIST_TODAY":
             today = date.today()
             routine_result:str = await get_routine_list(today, today, jwt_token)
             state["final_response"] = routine_result
@@ -136,6 +140,8 @@ def check_server_actions_direction_router(state: AgentState) -> str:
         return "find_medicine_details"
     elif direction == "register_routine_list":
         return "register_routine_list"
+    elif direction == "register_routine":
+        return "register_routine"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "save_conversation"
