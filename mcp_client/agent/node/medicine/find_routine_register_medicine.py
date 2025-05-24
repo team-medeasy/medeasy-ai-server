@@ -31,6 +31,7 @@ async def find_routine_register_medicine(state: AgentState)->AgentState:
         2. 사용자가 구체적인 약품명을 언급한 경우
         3. 사용자가 제조사나 특징을 언급한 경우
         4. 사용자가 "네", "맞아요", "그거요" 등의 긍정 표현을 사용한 경우
+        5. 사용자가 다른 종류의 의약품을 검색하거나, 아예 다른 요청을 할 경우 confidence 문자열값을 none 주세요.
         
         주의사항:
         - 명확하게 매칭되지 않으면 selected_medicine_id를 null로 설정하세요
@@ -57,6 +58,12 @@ async def find_routine_register_medicine(state: AgentState)->AgentState:
         selected_medicine = parse_medicine_selection_response(llm_response.content)
         logger.info(f"find_routine_register_medicine llm response after parse selected_medicine: {selected_medicine}")
 
+        if selected_medicine.get("confidence") == "none":
+            state["direction"] = "register_routine"
+            state["client_action"] = "REGISTER_ROUTINE"
+            state["response_data"] = None
+            return state
+
         if selected_medicine and selected_medicine.get("selected_medicine_id"):
             # 선택된 의약품 처리
             medicine_id = selected_medicine["selected_medicine_id"]
@@ -71,12 +78,14 @@ async def find_routine_register_medicine(state: AgentState)->AgentState:
                 agent_message = f"'{selected_medicine_info.get('item_name')}'이 선택되었습니다."
                 await agent_send_message(state, agent_message)
 
-                state["client_action"] = "register_routine"
-                state["direction"] = "routine_register"
+                state["client_action"] = "REGISTER_ROUTINE"
+                state["direction"] = "register_routine"
+                return state
             else:
                 state["final_response"] = "선택하신 의약품 정보를 찾을 수 없습니다. 나중에 다시 시도해주세요."
                 state["client_action"] = None
                 state["direction"] = "save_conversation"
+                return state
         else:
             # 선택되지 않은 경우
             medicine_list = format_medicine_list_for_user(medicines)
@@ -141,8 +150,8 @@ def format_medicine_list_for_user(medicines: List[Dict]) -> str:
     return "\n".join(formatted_lines)
 
 def find_routine_register_medicine_direction_router(state: AgentState) -> str:
-    if state["direction"] == "routine_register" :
-        return "routine_register"
+    if state["direction"] == "register_routine" :
+        return "register_routine"
 
     else:
         return "save_conversation"
