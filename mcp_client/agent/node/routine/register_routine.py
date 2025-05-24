@@ -120,7 +120,6 @@ async def register_routine(state: AgentState)->AgentState:
 
     # 메시지 스케줄 정보 추출
     if not state["temp_data"]["user_schedule_ids"]:
-    # 상태에 스케줄에 대한 정보가 없을 때, 메시지에 스케줄에 대한 언급이 있을 경우. -> 무한 루프 방지
         if parsed_data.get("user_schedule_names"):
             """
                 1. 사용자의 스케줄 리스트를 추출 schedule_service 파일에 메소드 하나 추가 
@@ -143,9 +142,8 @@ async def register_routine(state: AgentState)->AgentState:
             user = await get_user_info(state["jwt_token"])
             state["response_data"] = schedules
             state["client_action"] = "REGISTER_ROUTINE"
-            state["final_response"] = f"""
-                다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
-                \n\n{format_schedules_for_user(schedules)}\n\n
+            state["final_response"] = f"""다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
+                {format_schedules_for_user(schedules)}
             """
             state["direction"] = "save_conversation"
             return state
