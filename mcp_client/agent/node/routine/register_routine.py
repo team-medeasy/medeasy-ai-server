@@ -21,8 +21,7 @@ register_routine_prompt = """
 {
     "medicine_name": "씬지록신정",
     "dose": 5,
-    "user_schedules_names": ["아침", "점심"],
-    "user_schedules_times": ["09:27", "12:20"],
+    "user_schedule_names": ["아침", "점심"],
     "total_quantity": 6,
     "dose_days": 3
 }
@@ -31,13 +30,16 @@ register_routine_prompt = """
 - medicine_name: 사용자가 복용하려는 약의 이름입니다.
 - dose: 1회 복용량입니다.
 - user_schedule_names: 사용자가 약을 먹을 시간들입니다 (예: ["아침", "저녁"]).
-- user_schedule_times: 사용자가 약을 먹을 시간들입니다 (예: ["08:00", "20:00"]).
 - total_quantity: 복용 일정을 등록할 총 약의 개수입니다.
 - dose_days: 약을 복용할 날 수 입니다.
 
+시간 추출 예시:
+- "아침에 먹을거야" → {"user_schedule_names": ["아침"]}
+- "저녁에 복용하겠습니다" → {"user_schedule_names": ["저녁"]}
+- "아침, 저녁으로 해주세요" → {"user_schedule_names": ["아침", "저녁"]}
+
 주의사항: 
-- user_schedule_names와 user_schedule_times는 동일하게 사용자가 약 먹을 시간 내용을 담고 있습니다.
-- 둘 중에 한곳에만 언급한 시간 형태에 맞는 값을 넣어주세요.
+- 시간대 이름(아침, 점심, 저녁 등)이 언급되면 user_schedule_names에 넣으세요.
 - 응답은 반드시 JSON 형식으로만 출력해주세요.
 - JSON 외의 다른 텍스트는 포함하지 마세요.
 """
@@ -71,7 +73,6 @@ async def register_routine(state: AgentState)->AgentState:
     messages = [
         {"role": "system", "content": system_prompt+register_routine_prompt},
         {"role": "user", "content": user_message},
-        {"role": "system", "content": f"이전 대화 내용: {state.get('messages', '이전 대화 기록 없음')}"}
     ]
 
     llm_response= await final_response_llm.ainvoke(messages)
@@ -79,7 +80,8 @@ async def register_routine(state: AgentState)->AgentState:
     parsed_data = parse_llm_response(llm_response.content)
     logger.info(f"parsed_data: {parsed_data}")
 
-    if not parsed_data:
+    if not parsed_data and not state["temp_data"]["medicine_id"] and not state["temp_data"]["user_schedule_ids"]:
+        logger.info("복용 일정 첫 질문 시작")
         state["final_response"] = "복용 일정 등록에 필요한 약 이름, 복용량, 복용 시간 정보를 말씀해 주세요."
         state["direction"] = "save_conversation"
         return state
@@ -93,7 +95,7 @@ async def register_routine(state: AgentState)->AgentState:
 
     # medicine_name이 추출되었는지 확인
     medicine_name = parsed_data.get("medicine_name")
-    if medicine_name:
+    if not state["temp_data"]["medicine_id"] and medicine_name:
         logger.info(f"medicine_name: {medicine_name}")
         # 사용자의 메시지에 약이 언급된 경우
         # medicine search -> 검색된 데이터들을 리스트로 제공, 이 중 복용하실 의약품이 있으신가요?
@@ -102,12 +104,14 @@ async def register_routine(state: AgentState)->AgentState:
         state["final_response"] = "의약품 검색 결과입니다. 복용 일정을 등록할 의약품이 있으신가요?"
         state["client_action"] = "REGISTER_ROUTINE_SEARCH_MEDICINE"
         state["direction"] = "save_conversation"
+        return state
 
     if not medicine_name and not temp_data.get("medicine_id"):
         logger.info("not medicine id and name")
         # 의약품 검색
         state["final_response"] = "복용일정 등록을 위해 의약품 이름을 말씀해주세요!"
         state["client_action"] = "REGISTER_ROUTINE"
+        state["direction"] = "save_conversation"
 
         return state
 
@@ -118,9 +122,11 @@ async def register_routine(state: AgentState)->AgentState:
             2. names와 매칭되는 스케줄 ids 추출 
             3. ids 저장
         """
+        logger.info("스케줄 매칭")
         schedules = await get_user_schedules_info(jwt_token)
         state["response_data"] = schedules
-        state["direction"] = "register_routine"
+        state["direction"] = "match_user_schedule"
+        return state
 
     if not parsed_data.get("user_schedule_names"):
         """
@@ -130,22 +136,26 @@ async def register_routine(state: AgentState)->AgentState:
         schedules = await get_user_schedules_info(jwt_token)
         user = await get_user_info(state["jwt_token"])
         state["response_data"] = schedules
+        state["client_action"] = "REGISTER_ROUTINE"
         state["final_response"] = f"""
             다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
             \n\n{format_schedules_for_user(schedules)}\n\n
         """
-        state["direction"] = "register_routine"
+        state["direction"] = "save_conversation"
+        return state
 
     if not parsed_data.get("dose"):
         state["final_response"] = "복용하실 의약품의 1회 복용량을 알려주세요!"
         state["client_action"] = "REGISTER_ROUTINE"
         state["direction"] = "save_conversation"
+        state["response_data"] = None
         return state
 
     if not parsed_data.get("total_quantity"):
         state["final_response"] = "복용하실 의약품의 총 개수를 알려주세요!"
         state["client_action"] = "REGISTER_ROUTINE"
         state["direction"] = "save_conversation"
+        state["response_data"] = None
         return state
 
     return state
@@ -284,5 +294,7 @@ def register_routine_direction_router(state: AgentState)->str:
         return "find_routine_register_medicine"
     elif state["direction"] == "save_conversation":
         return "save_conversation"
+    elif state["direction"] == "match_user_schedule":
+        return "match_user_schedule"
     else:
         return "load_tools"

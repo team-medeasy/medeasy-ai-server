@@ -10,7 +10,7 @@ from mcp_client.client import final_response_llm
 logger = logging.getLogger(__name__)
 
 async def match_user_schedule(state: AgentState)->AgentState:
-    logger.info("execute find user schedule node")
+    logger.info("execute match user schedule node")
     user_message=state.get("current_message", "사용자 메시지가 없습니다.")
     schedules = state.get("response_data", [])
 
@@ -76,9 +76,11 @@ async def match_user_schedule(state: AgentState)->AgentState:
                 temp_data = state.get("temp_data", {})
                 temp_data["user_schedule_ids"] = valid_schedule_ids
                 state["temp_data"] = temp_data
+                logger.info(f"save temp_data's user_schedule_ids: {state['temp_data']}")
 
                 # 매칭된 스케줄 정보 생성
                 matched_schedules_info = get_matched_schedules_info(valid_schedule_ids, schedules)
+                logger.info(f"matched_schedules_info: {matched_schedules_info}")
 
                 agent_message = f"다음 일정으로 설정되었습니다: {matched_schedules_info}."
                 await agent_send_message(state, agent_message)
@@ -206,7 +208,7 @@ def validate_schedule_ids(schedule_ids: List[int], schedules: List[Dict[str, Any
 
     # 기존 스케줄 ID들 추출
     for schedule in schedules:
-        sid = schedule.get("schedule_id") or schedule.get("id")
+        sid = schedule.get("user_schedule_id") or schedule.get("id")
         if sid:
             existing_ids.append(int(sid))
 
@@ -232,10 +234,10 @@ def get_matched_schedules_info(schedule_ids: List[int], schedules: List[Dict[str
     matched_names = []
 
     for schedule in schedules:
-        sid = schedule.get("schedule_id") or schedule.get("id")
+        sid = schedule.get("user_schedule_id") or schedule.get("id")
         if sid and int(sid) in schedule_ids:
             name = schedule.get("name", "알 수 없음")
-            time = schedule.get("time", "")
+            time = schedule.get("take_time", "")
 
             if time:
                 matched_names.append(f"{name}({time})")
@@ -258,6 +260,5 @@ def get_example_schedules():
 def match_user_schedule_direction_router(state:AgentState) -> str:
     if state.get("direction")=="register_routine":
         return "register_routine"
-
     else:
         return "save_conversation"
