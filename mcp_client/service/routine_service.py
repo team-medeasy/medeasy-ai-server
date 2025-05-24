@@ -230,3 +230,30 @@ def format_prescription_for_voice(prescriptions: List[Dict[str, Any]]) -> str:
     ]
 
     return " ".join(lines)
+
+async def register_single_routine(
+        jwt_token: str,
+        medicine_id: str,
+        nickname: str,
+        user_schedule_ids: List[int],
+        dose: int,
+        total_quantity: int,
+):
+    api_url = f"{medeasy_api_url}/routine"
+
+    body = {
+        "medicine_id": medicine_id,
+        "nickname": nickname,
+        "dose": dose,
+        "total_quantity": total_quantity,
+        "interval_days": 1,
+        "user_schedule_ids": user_schedule_ids,
+    }
+
+    headers = {"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(api_url, headers=headers, json=body)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"루틴 생성 실패: {resp.text}")
+        return resp.json()

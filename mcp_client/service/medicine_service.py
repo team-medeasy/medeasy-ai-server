@@ -179,3 +179,22 @@ async def search_medicines_by_name(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"약 검색 중 오류: {str(e)}")
 
+async def find_medicine_by_id(
+        jwt_token: str,
+        medicine_id: str
+):
+    api_url = f"{medeasy_api_url}/medicine/medicine_id/{medicine_id}"
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, headers=headers)
+            response.raise_for_status()
+            medicine = response.json().get("body", [])
+
+            if not medicine:
+                return None
+
+            return medicine
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"약 검색 중 오류: {str(e)}")

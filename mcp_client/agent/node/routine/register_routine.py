@@ -7,7 +7,8 @@ from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node.schedule.match_user_schedule import format_schedules_for_user
 from mcp_client.client import final_response_llm
 from mcp_client.prompt import system_prompt
-from mcp_client.service.medicine_service import search_medicines_by_name
+from mcp_client.service.medicine_service import search_medicines_by_name, find_medicine_by_id
+from mcp_client.service.routine_service import register_single_routine
 from mcp_client.service.schedule_service import get_user_schedules_info
 from mcp_client.service.user_service import get_user_info
 
@@ -89,9 +90,11 @@ async def register_routine(state: AgentState)->AgentState:
     # 일단 의약품 이름 검사전에 복용량 정보가 있다면 대입, 맨 마지막에 값이 없으면 대입
     if parsed_data.get("dose"):
         state['temp_data']['dose'] = parsed_data.get("dose")
+        logger.info(f"temp data debugging: {state['temp_data']}")
 
     if parsed_data.get("total_quantity"):
         state['temp_data']['total_quantity'] = parsed_data.get("total_quantity")
+        logger.info(f"temp data debugging: {state['temp_data']}")
 
     # medicine_name이 추출되었는지 확인
     medicine_name = parsed_data.get("medicine_name")
@@ -115,50 +118,70 @@ async def register_routine(state: AgentState)->AgentState:
 
         return state
 
-    # 스케줄 관련 값 검사
-    if parsed_data.get("user_schedule_names"):
-        """
-            1. 사용자의 스케줄 리스트를 추출 schedule_service 파일에 메소드 하나 추가 
-            2. names와 매칭되는 스케줄 ids 추출 
-            3. ids 저장
-        """
-        logger.info("스케줄 매칭")
-        schedules = await get_user_schedules_info(jwt_token)
-        state["response_data"] = schedules
-        state["direction"] = "match_user_schedule"
-        return state
+    # 메시지 스케줄 정보 추출
+    if not state["temp_data"]["user_schedule_ids"]:
+    # 상태에 스케줄에 대한 정보가 없을 때, 메시지에 스케줄에 대한 언급이 있을 경우. -> 무한 루프 방지
+        if parsed_data.get("user_schedule_names"):
+            """
+                1. 사용자의 스케줄 리스트를 추출 schedule_service 파일에 메소드 하나 추가 
+                2. names와 매칭되는 스케줄 ids 추출 
+                3. ids 저장
+            """
+            logger.info("스케줄 매칭")
+            schedules = await get_user_schedules_info(jwt_token)
+            state["response_data"] = schedules
+            state["direction"] = "match_user_schedule"
+            return state
 
-    if not parsed_data.get("user_schedule_names"):
-        """
-            1. 사용자의 스케줄 리스트를 추출
-            2. 이 시간 중 약을 언제 드시고 싶으신가요??
-        """
-        schedules = await get_user_schedules_info(jwt_token)
-        user = await get_user_info(state["jwt_token"])
-        state["response_data"] = schedules
-        state["client_action"] = "REGISTER_ROUTINE"
-        state["final_response"] = f"""
-            다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
-            \n\n{format_schedules_for_user(schedules)}\n\n
-        """
-        state["direction"] = "save_conversation"
-        return state
+        # 상태에 스케줄에 대한 정보가 없는데, 사용자의 메시지에도 스케줄 내용이 없는 경우
+        if not parsed_data.get("user_schedule_names"):
+            """
+                1. 사용자의 스케줄 리스트를 추출
+                2. 이 시간 중 약을 언제 드시고 싶으신가요??
+            """
+            schedules = await get_user_schedules_info(jwt_token)
+            user = await get_user_info(state["jwt_token"])
+            state["response_data"] = schedules
+            state["client_action"] = "REGISTER_ROUTINE"
+            state["final_response"] = f"""
+                다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
+                \n\n{format_schedules_for_user(schedules)}\n\n
+            """
+            state["direction"] = "save_conversation"
+            return state
 
-    if not parsed_data.get("dose"):
-        state["final_response"] = "복용하실 의약품의 1회 복용량을 알려주세요!"
-        state["client_action"] = "REGISTER_ROUTINE"
-        state["direction"] = "save_conversation"
-        state["response_data"] = None
-        return state
-
-    if not parsed_data.get("total_quantity"):
-        state["final_response"] = "복용하실 의약품의 총 개수를 알려주세요!"
+    if not parsed_data.get("dose") and not state["temp_data"]["dose"]:
+        state["final_response"] = "의약품의 1회 복용량을 알려주세요!"
         state["client_action"] = "REGISTER_ROUTINE"
         state["direction"] = "save_conversation"
         state["response_data"] = None
         return state
 
-    return state
+    if not parsed_data.get("total_quantity") and not state["temp_data"]["total_quantity"]:
+        state["final_response"] = "의약품의 총 개수를 알려주세요!"
+        state["client_action"] = "REGISTER_ROUTINE"
+        state["direction"] = "save_conversation"
+        state["response_data"] = None
+        return state
+
+    if state["temp_data"]["medicine_id"] and state["temp_data"]["user_schedule_ids"]and state["temp_data"]["dose"] and state["temp_data"]["total_quantity"]:
+        if not state["temp_data"]["nickname"]:
+            medicine=await find_medicine_by_id(jwt_token, state["temp_data"]["medicine_id"])
+            state["temp_data"]["nickname"] = medicine.get("item_name")
+
+        await register_single_routine(
+            jwt_token,
+            state["temp_data"]["medicine_id"],
+            state["temp_data"]["nickname"],
+            state["temp_data"]["user_schedule_ids"],
+            state["temp_data"]["dose"],
+            state["temp_data"]["total_quantity"],
+        )
+
+        state["final_response"] = "복용 일정 등록이 완료되었습니다! 일정 확인이 필요하시면 말씀해주세요!"
+        state["direction"] = "save_conversation"
+        logger.info("register routine node finish")
+        return state
 
 
 def parse_llm_response(response_content: str) -> Optional[Dict[str, Any]]:
