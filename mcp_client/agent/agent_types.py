@@ -29,6 +29,7 @@ class AgentState(TypedDict):
 
     response_data: Any
     client_action: Optional[str]  # 사진 촬영 요청 타입 (있는 경우)
+    temp_data: Any
 
 def init_state(state: AgentState):
     client_action = state.get("client_action")

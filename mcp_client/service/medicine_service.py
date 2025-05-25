@@ -3,11 +3,15 @@ import os
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 
+import httpx
+from fastapi import HTTPException
+
 from backend.search.logic import search_pills, search_medicine_by_item_seq
 from backend.services.gemini_service import analyze_pill_image
 
 logger = logging.getLogger(__name__)
 
+medeasy_api_url=os.getenv("MEDEASY_API_URL", "https://api.medeasy.dev")
 
 async def process_pill_image(image_data: bytes) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """
@@ -151,3 +155,46 @@ def format_medicine_search_results(medicines: List[Dict[str, Any]]) -> str:
     lines.append("의약품 정보를 자세히 알려드리거나, 복용 일정을 등록해드릴게요!")
 
     return "\n".join(lines)
+
+
+async def search_medicines_by_name(
+        jwt_token: str,
+        medicine_name: str
+):
+    api_url = f"{medeasy_api_url}/medicine/search"
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    params = {"name": medicine_name}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, headers=headers, params=params)
+            response.raise_for_status()
+            medicines = response.json().get("body", [])
+
+            if not medicines:
+                return None
+
+            # 첫 번째 검색 결과 사용 (가장 관련성 높은 결과로 가정)
+            return medicines
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"약 검색 중 오류: {str(e)}")
+
+async def find_medicine_by_id(
+        jwt_token: str,
+        medicine_id: str
+):
+    api_url = f"{medeasy_api_url}/medicine/medicine_id/{medicine_id}"
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, headers=headers)
+            response.raise_for_status()
+            medicine = response.json().get("body", [])
+
+            if not medicine:
+                return None
+
+            return medicine
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"약 검색 중 오류: {str(e)}")

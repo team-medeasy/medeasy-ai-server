@@ -44,6 +44,7 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
     Returns:
         업데이트된 에이전트 상태
     """
+    logger.info("execute detect_conversation_shift node")
     # 처방전 등록 응답 검토 단계인 경우 - 사용자의 의도 파악
     if state.get("client_action") == "REVIEW_PRESCRIPTION_REGISTER_RESPONSE":
         user_message = state.get("current_message", "")
@@ -172,12 +173,14 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
                 state["direction"] = "save_conversation"
                 state['final_response'] = "죄송합니다. 찾는 약이 없으시군요. 의약품을 밝은 곳에서 다시 촬영해주시면 한번 더 약을 찾아드릴게요."
                 state["client_action"] = "UPLOAD_PILLS_PHOTO"
+                state['response_data'] = None
                 return state
 
             elif "DETAIL" in intent: # 의약품 상제 정보를 얻고 싶을 때
                 state["direction"] = "find_medicine_details"
 
             elif "REGISTER" in intent:
+                #TODO register 구현 필요 register routine list 노드 활용하면 좋을텐데 routine_list 등록에 필요한 정보를 다 모으는 것이 목적
                 state["direction"] = "register_medicine"
 
             else:  # "OTHER" 또는 기타 의도 -> load_tools
@@ -198,6 +201,11 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
             state["client_action"] = None
 
 
+    elif state["client_action"] == "REGISTER_ROUTINE":
+        state["direction"] = "register_routine"
+
+    elif state["client_action"] == "REGISTER_ROUTINE_SEARCH_MEDICINE":
+        state["direction"] = "find_routine_register_medicine"
     return state
 
 
@@ -389,6 +397,10 @@ def direction_router(state: AgentState) -> str:
         return "save_conversation"
     elif direction == "find_medicine_details":
         return "find_medicine_details"
+    elif direction == "register_routine":
+        return "register_routine"
+    elif direction == "find_routine_register_medicine":
+        return "find_routine_register_medicine"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "load_tools"

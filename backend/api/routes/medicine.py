@@ -84,6 +84,10 @@ async def search_by_image(
         formatted_results = []
         for candidate in analysis_results:
             # candidate는 {"drug_shape": ..., "color_classes": ..., "imprint": ...} 형태입니다.
+            # ⬇ imprint 정제 추가
+            if "imprint" in candidate and candidate["imprint"]:
+                candidate["imprint"] = candidate["imprint"].replace(" ", "").replace("|", "").replace("\n", "").replace(
+                    "\r", "")
             search_result = await search_pills(candidate, top_k=top_k)
             formatted_results.append({
                 "analysis": candidate,

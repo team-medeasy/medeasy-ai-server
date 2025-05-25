@@ -7,9 +7,14 @@ from starlette.websockets import WebSocket
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node import *
 from mcp_client.agent.node import detect_conversation_shift, direction_router
+from mcp_client.agent.node.check_client_actions import check_client_actions_direction_router
 from mcp_client.agent.node.check_server_actions import check_server_actions_direction_router
 from mcp_client.agent.node.medicine.find_medicine_details import find_medicine_details
+from mcp_client.agent.node.medicine.find_routine_register_medicine import find_routine_register_medicine, \
+    find_routine_register_medicine_direction_router
+from mcp_client.agent.node.routine.register_routine import register_routine, register_routine_direction_router
 from mcp_client.agent.node.routine.register_routine_list import register_routine_list
+from mcp_client.agent.node.schedule.match_user_schedule import match_user_schedule, match_user_schedule_direction_router
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +26,15 @@ def build_agent_graph():
     # 노드 추가
     graph.add_node("retrieve_context", retrieve_context)
     graph.add_node("detect_conversation_shift", detect_conversation_shift)
+
     graph.add_node("find_medicine_details", find_medicine_details)
     graph.add_node("check_server_actions", check_server_actions)
+
     graph.add_node("register_routine_list", register_routine_list)
+    graph.add_node("register_routine", register_routine)
+    graph.add_node("find_routine_register_medicine", find_routine_register_medicine)
+
+    graph.add_node("match_user_schedule", match_user_schedule)
 
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
@@ -50,7 +61,9 @@ def build_agent_graph():
             "check_server_actions": "check_server_actions",
             "load_tools": "load_tools",
             "save_conversation": "save_conversation",
-            "find_medicine_details": "find_medicine_details"
+            "find_medicine_details": "find_medicine_details",
+            "register_routine": "register_routine",
+            "find_routine_register_medicine": "find_routine_register_medicine"
         }
     )
 
@@ -60,6 +73,36 @@ def build_agent_graph():
         check_server_actions_direction_router,
         {
             "register_routine_list": "register_routine_list",
+            "save_conversation": "save_conversation",
+            "register_routine": "register_routine"
+        }
+    )
+
+    graph.add_conditional_edges(
+        "register_routine",
+        register_routine_direction_router,
+        {
+            "find_routine_register_medicine": "find_routine_register_medicine",
+            "save_conversation": "save_conversation",
+            "load_tools": "load_tools",
+            "match_user_schedule": "match_user_schedule",
+        }
+    )
+
+    graph.add_conditional_edges(
+        "find_routine_register_medicine",
+        find_routine_register_medicine_direction_router,
+        {
+            "register_routine" : "register_routine",
+            "save_conversation": "save_conversation",
+        }
+    )
+
+    graph.add_conditional_edges(
+        "match_user_schedule",
+        match_user_schedule_direction_router,
+        {
+            "register_routine" : "register_routine",
             "save_conversation": "save_conversation",
         }
     )
@@ -82,10 +125,11 @@ def build_agent_graph():
     )
     graph.add_conditional_edges(
         "check_client_actions",
-        has_capture_request,
+        check_client_actions_direction_router,
         {
             "capture": "save_conversation",
-            "continue": "execute_tools"
+            "register_routine": "register_routine",
+            "execute_tools": "execute_tools"
         }
     )
     graph.add_conditional_edges(
@@ -108,7 +152,7 @@ def build_agent_graph():
 # 메인 함수
 async def process_user_message(
         state: AgentState,
-) -> Tuple[str, Optional[str], Optional[str]]:
+) -> Tuple[str, Optional[str], Optional[str], Optional[Any]]:
     """
     사용자의 메시지에 대해 LangGraph를 사용하여 요청 처리
 
@@ -132,11 +176,11 @@ async def process_user_message(
         except Exception as e:
             logger.error(f"그래프 실행 중 오류 발생: {str(e)}", exc_info=True)
             # 오류 발생 시 기본 응답 생성
-            return f"죄송합니다. 요청을 처리하는 중 오류가 발생했습니다: {str(e)}", None, None
+            return f"죄송합니다. 요청을 처리하는 중 오류가 발생했습니다: {str(e)}", None, None, None
 
     except Exception as e:
         logger.error(f"그래프 구성 중 오류 발생: {str(e)}", exc_info=True)
-        return "시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", None, None
+        return "시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", None, None, None
 
     logger.info(f"medeasy agent final_response: {state['final_response']}")
-    return final_state["final_response"], final_state.get("client_action"), final_state.get("response_data")
+    return final_state["final_response"], final_state.get("client_action"), final_state.get("response_data"), final_state.get("temp_data")

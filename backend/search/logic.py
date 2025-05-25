@@ -119,15 +119,15 @@ def build_es_query(norm: Dict[str, Any], top_k: int) -> Dict[str, Any]:
             filter_clauses.append({
                 "bool": {
                     "should": [
-                        {"term": {"color_group": norm["primary_color_group"]}},
-                        {"term": {"color_group": norm["secondary_color_group"]}}
+                        {"terms": {"color_group": norm["primary_color_group"]}},
+                        {"terms": {"color_group": norm["secondary_color_group"]}}
                     ],
                     "minimum_should_match": 1
                 }
             })
         else:
             filter_clauses.append({
-                "term": {"color_group": norm["primary_color_group"]}
+                "terms": {"color_group": norm["primary_color_group"]}
             })
 
     # 3. 인쇄문자 및 마크 코드 관련 쿼리
