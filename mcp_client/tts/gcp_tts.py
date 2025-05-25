@@ -20,10 +20,12 @@ async def convert_text_to_speech(request: str):
             "input": {"text": request},
             "voice": {
                 "language_code": "ko-KR",
-                "ssml_gender": texttospeech_v1beta1.SsmlVoiceGender.MALE
+                "name": "ko-KR-Neural2-C"  # 이 부분을 Neural2 음성 이름으로 변경합니다.
             },
             "audio_config": {
-                "audio_encoding": texttospeech_v1beta1.AudioEncoding.MP3
+                "audio_encoding": texttospeech_v1beta1.AudioEncoding.MP3,
+                "speaking_rate": 1.0,
+                # 말하기 속도 (0.25 ~ 4.0, 기본값 1.0)        "pitch": 2.0,  # 음성 피치 (-20.0 ~ 20.0, 기본값 0.0)        # "volume_gain_db": 0.0, # 볼륨 게인 (-96.0 ~ 16.0 dB, 기본값 0.0)        "sample_rate_hertz": 24000, # 필요시 샘플링 속도 지정 8000, 16000, 24000, 48000        "effects_profile_id": ["handset-class-device"]
             }
         }
 
