@@ -220,6 +220,40 @@ def validate_schedule_ids(schedule_ids: List[int], schedules: List[Dict[str, Any
     return valid_ids
 
 
+def format_time(time_str: str) -> str:
+    """
+    HH:MM:SS 형태의 시간을 H시 M분 형태로 변환
+
+    Args:
+        time_str: "01:30:00" 형태의 시간 문자열
+
+    Returns:
+        "1시 30분" 형태의 포맷된 시간 문자열
+    """
+    if not time_str:
+        return ""
+
+    try:
+        # HH:MM:SS에서 시, 분 추출
+        parts = time_str.split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1])
+
+        # 포맷팅
+        result = ""
+        if hours > 0:
+            result += f"{hours}시"
+        if minutes > 0:
+            if result:  # 시간이 있으면 공백 추가
+                result += " "
+            result += f"{minutes}분"
+
+        return result if result else "0분"
+
+    except (ValueError, IndexError):
+        return time_str  # 파싱 실패시 원본 반환
+
+
 def get_matched_schedules_info(schedule_ids: List[int], schedules: List[Dict[str, Any]]) -> str:
     """
     매칭된 스케줄들의 정보를 사용자 친화적 형태로 반환
@@ -240,7 +274,8 @@ def get_matched_schedules_info(schedule_ids: List[int], schedules: List[Dict[str
             time = schedule.get("take_time", "")
 
             if time:
-                matched_names.append(f"{name}({time})")
+                formatted_time = format_time(time)
+                matched_names.append(f"{name}({formatted_time})")
             else:
                 matched_names.append(name)
 

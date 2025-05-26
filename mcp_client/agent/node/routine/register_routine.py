@@ -43,6 +43,8 @@ register_routine_prompt = """
 - 시간대 이름(아침, 점심, 저녁 등)이 언급되면 user_schedule_names에 넣으세요.
 - 응답은 반드시 JSON 형식으로만 출력해주세요.
 - JSON 외의 다른 텍스트는 포함하지 마세요.
+- dose, total_quantity에 대해서 숫자만 언급하더라도 등록해줘 : '7개', '7', '7정' -> 7
+- 이전 채팅 내역을 참고하여 자연스러운 흐름으로 대화를 진행해줘 
 """
 
 async def register_routine(state: AgentState)->AgentState:
@@ -56,6 +58,11 @@ async def register_routine(state: AgentState)->AgentState:
     }
     """
     logger.info("execute register routine node")
+
+    history_prompt = f"""
+    이전 대화 내역: {state["messages"]}
+    """
+    logger.info(f"이전 대화 내역: {history_prompt}")
 
     # temp_data 초기화 또는 업데이트
     if not state["temp_data"]:
@@ -72,6 +79,7 @@ async def register_routine(state: AgentState)->AgentState:
     jwt_token = state.get("jwt_token")
 
     messages = [
+        {"role": "system", "content": history_prompt},
         {"role": "system", "content": system_prompt+register_routine_prompt},
         {"role": "user", "content": user_message},
     ]
@@ -142,8 +150,8 @@ async def register_routine(state: AgentState)->AgentState:
             user = await get_user_info(state["jwt_token"])
             state["response_data"] = schedules
             state["client_action"] = "REGISTER_ROUTINE"
-            state["final_response"] = f"""다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?:
-                {format_schedules_for_user(schedules)}
+            state["final_response"] = f"""다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?
+            {format_schedules_for_user(schedules)}
             """
             state["direction"] = "save_conversation"
             return state
