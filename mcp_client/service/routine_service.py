@@ -54,7 +54,7 @@ async def get_routine_list(
 
             result = response.json()
 
-            return result["message"]
+            return result
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
