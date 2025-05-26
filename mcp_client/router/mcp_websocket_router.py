@@ -77,7 +77,7 @@ async def websocket_message_voice(websocket: WebSocket):
             server_action = client_message.get("server_action")
             data = client_message.get("data")
 
-            logger.info(f"WebSocket message from user {user_id}")
+            logger.info(f"WebSocket message from user {user_id}, message: {message}")
 
             try:
                 state["server_action"] = server_action
