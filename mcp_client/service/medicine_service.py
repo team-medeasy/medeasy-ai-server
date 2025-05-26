@@ -126,31 +126,31 @@ def format_medicine_search_results(medicines: List[Dict[str, Any]]) -> str:
     # 헤더 메시지
     lines = ["의약품 사진 검색 결과입니다."]
 
-    # 각 의약품 정보 추가
-    for idx, med in enumerate(medicines, 1):
-        class_name = med.get("class_name", "")
-        item_name = med.get("item_name", "")
-        drug_shape = med.get("drug_shape", "")
-        chart = med.get("chart", "")
-
-        # 마크 정보 구성
-        mark_info = []
-        front_print = med.get("print_front", "")
-        back_print = med.get("print_back", "")
-
-        if front_print:
-            mark_info.append(f"앞면 '{front_print}'")
-        if back_print and back_print != front_print:
-            mark_info.append(f"뒷면 '{back_print}'")
-
-        mark_text = ", ".join(mark_info) if mark_info else ""
-
-        # 의약품 정보 한 줄로 구성
-        med_info = f"{idx}. {class_name}, {item_name}, {drug_shape}, {chart}, {mark_text}"
-        lines.append(med_info)
-
-    # 질문 추가
-    lines.append("")  # 빈 줄 추가
+    # # 각 의약품 정보 추가
+    # for idx, med in enumerate(medicines, 1):
+    #     class_name = med.get("class_name", "")
+    #     item_name = med.get("item_name", "")
+    #     drug_shape = med.get("drug_shape", "")
+    #     chart = med.get("chart", "")
+    #
+    #     # 마크 정보 구성
+    #     mark_info = []
+    #     front_print = med.get("print_front", "")
+    #     back_print = med.get("print_back", "")
+    #
+    #     if front_print:
+    #         mark_info.append(f"앞면 '{front_print}'")
+    #     if back_print and back_print != front_print:
+    #         mark_info.append(f"뒷면 '{back_print}'")
+    #
+    #     mark_text = ", ".join(mark_info) if mark_info else ""
+    #
+    #     # 의약품 정보 한 줄로 구성
+    #     med_info = f"{idx}. {class_name}, {item_name}, {drug_shape}, {chart}, {mark_text}"
+    #     lines.append(med_info)
+    #
+    # # 질문 추가
+    # lines.append("")  # 빈 줄 추가
     lines.append("이중 찾으시는 의약품이 있으신가요?")
     lines.append("의약품 정보를 자세히 알려드리거나, 복용 일정을 등록해드릴게요!")
 
