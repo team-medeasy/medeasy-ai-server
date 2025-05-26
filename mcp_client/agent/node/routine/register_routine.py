@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.agent.node.schedule.match_user_schedule import format_schedules_for_user
+from mcp_client.chat_session_repo import chat_session_repo
 from mcp_client.client import final_response_llm
 from mcp_client.prompt import system_prompt
 from mcp_client.service.medicine_service import search_medicines_by_name, find_medicine_by_id
@@ -15,19 +16,27 @@ from mcp_client.service.user_service import get_user_info
 logger = logging.getLogger(__name__)
 
 register_routine_prompt = """
-사용자의 메시지를 분석하여 아래와 같은 결과를 출력해주세요.
-메시지로부터 추출할 값들을 넣되 언급이 없는 값들은 null 값으로 넣어주세요.
+사용자의 메시지를 분석하여 아래와 같은 결과를 출력해주세요. 메시지로부터 추출할 값들을 넣되 언급이 없는 값들은 null 값으로 넣어주세요.
 
-응답 템플릿 예시: 
+응답 템플릿 예시:
 {
-    "medicine_name": "씬지록신정",
-    "dose": 5,
-    "user_schedule_names": ["아침", "점심"],
-    "total_quantity": 6,
-    "dose_days": 3
+    "extracted_data": {
+        "medicine_name": "씬지록신정",
+        "dose": 5,
+        "user_schedule_names": ["아침", "점심"],
+        "total_quantity": 6,
+        "dose_days": 3
+    },
+    "extraction_reasoning": {
+        "medicine_name": "사용자가 '씬지록신정을 복용하겠다'고 명시적으로 언급했습니다.",
+        "dose": "사용자가 '하루에 5mg씩'이라고 구체적인 복용량을 제시했습니다.",
+        "user_schedule_names": "사용자가 '아침과 점심에 먹겠다'고 시간대를 명확히 지정했습니다.",
+        "total_quantity": "사용자가 '총 6알 있다'고 보유 수량을 언급했습니다.",
+        "dose_days": "사용자가 '3일간 복용 예정'이라고 기간을 명시했습니다."
+    }
 }
 
-예시 필드 설명: 
+필드 설명:
 - medicine_name: 사용자가 복용하려는 약의 이름입니다.
 - dose: 1회 복용량입니다.
 - user_schedule_names: 사용자가 약을 먹을 시간들입니다 (예: ["아침", "저녁"]).
@@ -39,14 +48,21 @@ register_routine_prompt = """
 - "저녁에 복용하겠습니다" → {"user_schedule_names": ["저녁"]}
 - "아침, 저녁으로 해주세요" → {"user_schedule_names": ["아침", "저녁"]}
 
-주의사항: 
+주의사항:
 - 시간대 이름(아침, 점심, 저녁 등)이 언급되면 user_schedule_names에 넣으세요.
 - 응답은 반드시 JSON 형식으로만 출력해주세요.
 - JSON 외의 다른 텍스트는 포함하지 마세요.
 - dose, total_quantity에 대해서 숫자만 언급하더라도 등록해줘 : '7개', '7', '7정' -> 7
-- 이전 채팅 내역을 참고하여 자연스러운 흐름으로 대화를 진행해줘 
-"""
+- 이전 채팅 내역을 참고하여 자연스러운 흐름으로 대화를 진행해줘
+- 약 이름에 숫자가 섞여있는 경우가 있는데 이때 그 숫자를 복용량으로 헷갈려서 dose나 total_quantity 에 값을 넣으면 안돼
+- 약 복약 정보에 대한 숫자 메시지가 들어오면, dose와 quantity 중 어디에 값을 넣을지 명확하지 않다면 과거 채팅 내역 중 agent 역할 즉 너가 한 가장 최근의 질문을 보면서 유추해줘
 
+extraction_reasoning 필드 작성 가이드:
+- 각 필드를 추출한 구체적인 근거를 명시하세요.
+- 사용자 메시지의 어떤 부분에서 해당 정보를 추출했는지 설명하세요.
+- null 값인 경우 "해당 정보가 메시지에 언급되지 않았습니다"라고 작성하세요.
+- 이전 대화 내역을 참고한 경우 그 내용도 명시하세요.
+"""
 async def register_routine(state: AgentState)->AgentState:
     """
     state[response_data] = {
@@ -58,6 +74,7 @@ async def register_routine(state: AgentState)->AgentState:
     }
     """
     logger.info("execute register routine node")
+    logger.info(f"temp data debugging: {state['temp_data']}")
 
     history_prompt = f"""
     이전 대화 내역: {state["messages"]}
@@ -66,6 +83,12 @@ async def register_routine(state: AgentState)->AgentState:
 
     # temp_data 초기화 또는 업데이트
     if not state["temp_data"]:
+        # 기존 채팅 세션이 있으면 삭제 (이전 대화 내역 초기화)
+        user_id = state["temp_data"]
+        if user_id and chat_session_repo.session_exists(user_id):
+            chat_session_repo.clear_session(user_id)
+            logger.info(f"이전 대화 내역 초기화 완료: user_id={user_id}")
+
         state["temp_data"] = {
             "medicine_id": None,
             "nickname": None,
@@ -86,23 +109,14 @@ async def register_routine(state: AgentState)->AgentState:
 
     llm_response= await final_response_llm.ainvoke(messages)
     # LLM 응답에서 JSON 파싱
-    parsed_data = parse_llm_response(llm_response.content)
+    parsed_data, extraction_reasoning = parse_llm_response_with_reasoning(llm_response.content)
     logger.info(f"parsed_data: {parsed_data}")
+    logger.info(f"extraction_reasoning: {extraction_reasoning}")
 
     if not parsed_data and not state["temp_data"]["medicine_id"] and not state["temp_data"]["user_schedule_ids"]:
-        logger.info("복용 일정 첫 질문 시작")
         state["final_response"] = "복용 일정 등록에 필요한 약 이름, 복용량, 복용 시간 정보를 말씀해 주세요."
         state["direction"] = "save_conversation"
         return state
-
-    # 일단 의약품 이름 검사전에 복용량 정보가 있다면 대입, 맨 마지막에 값이 없으면 대입
-    if parsed_data.get("dose"):
-        state['temp_data']['dose'] = parsed_data.get("dose")
-        logger.info(f"temp data debugging: {state['temp_data']}")
-
-    if parsed_data.get("total_quantity"):
-        state['temp_data']['total_quantity'] = parsed_data.get("total_quantity")
-        logger.info(f"temp data debugging: {state['temp_data']}")
 
     # medicine_name이 추출되었는지 확인
     medicine_name = parsed_data.get("medicine_name")
@@ -150,11 +164,17 @@ async def register_routine(state: AgentState)->AgentState:
             user = await get_user_info(state["jwt_token"])
             state["response_data"] = schedules
             state["client_action"] = "REGISTER_ROUTINE"
-            state["final_response"] = f"""다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요?
-            {format_schedules_for_user(schedules)}
+            state["final_response"] = f"""다음 {user.get("name")}님의 일정 중에서 약을 언제 복용하실건가요? 
+{format_schedules_for_user(schedules)}
             """
             state["direction"] = "save_conversation"
             return state
+
+    if parsed_data.get("dose") and not state["temp_data"]["dose"]:
+        state['temp_data']['dose'] = parsed_data.get("dose")
+
+    if parsed_data.get("total_quantity") and not state["temp_data"]["total_quantity"]:
+        state['temp_data']['total_quantity'] = parsed_data.get("total_quantity")
 
     if not parsed_data.get("dose") and not state["temp_data"]["dose"]:
         state["final_response"] = "의약품의 1회 복용량을 알려주세요!"
@@ -169,6 +189,7 @@ async def register_routine(state: AgentState)->AgentState:
         state["direction"] = "save_conversation"
         state["response_data"] = None
         return state
+
 
     if state["temp_data"]["medicine_id"] and state["temp_data"]["user_schedule_ids"]and state["temp_data"]["dose"] and state["temp_data"]["total_quantity"]:
         if not state["temp_data"]["nickname"]:
@@ -223,6 +244,75 @@ def parse_llm_response(response_content: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"LLM 응답 파싱 중 오류: {str(e)}")
         return None
+
+
+def parse_llm_response_with_reasoning(response_content):
+    """LLM 응답에서 JSON을 파싱하고 extracted_data와 extraction_reasoning을 분리"""
+    try:
+        # 1. JSON 부분만 추출 (중괄호로 둘러싸인 부분)
+        json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+
+        if not json_match:
+            logger.warning("응답에서 JSON 형식을 찾을 수 없습니다.")
+            return None, None
+
+        json_str = json_match.group()
+        # logger.info(f"추출된 JSON 문자열: {json_str}")
+
+        # 2. JSON 파싱
+        parsed_response = json.loads(json_str)
+        # logger.info(f"파싱된 JSON: {parsed_response}")
+
+        # 3. 응답 구조 검증
+        if "extracted_data" not in parsed_response:
+            logger.warning("extracted_data 필드가 없습니다. 기존 형식으로 처리합니다.")
+            # 기존 형식 (직접 데이터가 최상위에 있는 경우) 처리
+            extracted_data = {
+                "medicine_name": parsed_response.get("medicine_name"),
+                "dose": parsed_response.get("dose"),
+                "user_schedule_names": parsed_response.get("user_schedule_names"),
+                "total_quantity": parsed_response.get("total_quantity"),
+                "dose_days": parsed_response.get("dose_days")
+            }
+            extraction_reasoning = {}
+        else:
+            # 4. extracted_data와 extraction_reasoning 분리
+            extracted_data = parsed_response.get("extracted_data", {})
+            extraction_reasoning = parsed_response.get("extraction_reasoning", {})
+
+        # 5. 추출된 데이터 검증 및 로깅
+        # logger.info(f"추출된 데이터: {extracted_data}")
+        # logger.info(f"추출 이유: {extraction_reasoning}")
+
+        # 6. 필수 필드 존재 여부 확인
+        required_fields = ["medicine_name", "dose", "user_schedule_names", "total_quantity"]
+        missing_fields = [field for field in required_fields if field not in extracted_data]
+        if missing_fields:
+            logger.warning(f"누락된 필드: {missing_fields}")
+
+        # 7. 데이터 타입 검증
+        if extracted_data.get("dose") is not None and not isinstance(extracted_data["dose"], (int, float)):
+            logger.warning(f"dose 필드의 타입이 올바르지 않습니다: {type(extracted_data['dose'])}")
+
+        if extracted_data.get("total_quantity") is not None and not isinstance(extracted_data["total_quantity"],
+                                                                               (int, float)):
+            logger.warning(f"total_quantity 필드의 타입이 올바르지 않습니다: {type(extracted_data['total_quantity'])}")
+
+        if extracted_data.get("user_schedule_names") is not None and not isinstance(
+                extracted_data["user_schedule_names"], list):
+            logger.warning(f"user_schedule_names 필드의 타입이 올바르지 않습니다: {type(extracted_data['user_schedule_names'])}")
+
+        return extracted_data, extraction_reasoning
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON 디코딩 오류: {e}")
+        logger.error(f"문제가 된 JSON 문자열: {json_str if 'json_str' in locals() else 'N/A'}")
+        return None, None
+
+    except Exception as e:
+        logger.error(f"예상치 못한 파싱 오류: {e}")
+        logger.error(f"응답 내용: {response_content}")
+        return None, None
 
 
 def extract_json_from_text(text: str) -> Optional[str]:
