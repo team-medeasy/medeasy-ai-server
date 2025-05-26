@@ -1,12 +1,14 @@
+import logging
 import json
 from datetime import date
-
 from mcp_client.agent.agent_types import AgentState
 from mcp_client.client import gpt_nano
 from mcp_client.service.routine_service import get_routine_list
 
+logger = logging.getLogger(__name__)
 
 async def get_routine_list_today(state: AgentState) -> AgentState:
+    logger.info("execute get routine list today node")
     today = date.today()
     routine_list_data = await get_routine_list(today, today, state["jwt_token"])
 
@@ -24,7 +26,9 @@ async def get_routine_list_today(state: AgentState) -> AgentState:
 4. 복용 완료된 약이 있다면 칭찬과 격려
 5. 전체적으로 따뜻하고 격려하는 톤으로 작성
 
-하나의 자연스러운 문자열 메시지로 응답해주세요.
+하나의 자연스러운 문자열 메시지로 보통의 경우 100자 안에 응답해주세요
+단 안내해야하는 약품의 양이 많거나, 사용자가 자세하게 요청할 때는 유도리 있게 글자수를 늘려도 돼
+중요한 건 간결하고 정확하게 필요한 정보를 알려주는 것!!.
 """
 
     # GPT nano 호출

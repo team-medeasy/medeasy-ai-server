@@ -28,9 +28,7 @@ async def check_server_actions(state: AgentState) -> AgentState:
 
         # 오늘 복용 일정 확인
         elif server_action == "GET_ROUTINE_LIST_TODAY":
-            today = date.today()
-            routine_result:str = await get_routine_list(today, today, jwt_token)
-            state["final_response"] = routine_result
+            state['direction'] = 'get_routine_list_today'
 
         # 처방전 촬영 버튼
         elif server_action == "PRESCRIPTION_ROUTINE_REGISTER_REQUEST":
@@ -142,6 +140,8 @@ def check_server_actions_direction_router(state: AgentState) -> str:
         return "register_routine_list"
     elif direction == "register_routine":
         return "register_routine"
+    elif direction == "get_routine_list_today":
+        return "get_routine_list_today"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "save_conversation"
