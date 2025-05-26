@@ -12,7 +12,8 @@ from mcp_client.agent.node.check_server_actions import check_server_actions_dire
 from mcp_client.agent.node.medicine.find_medicine_details import find_medicine_details
 from mcp_client.agent.node.medicine.find_routine_register_medicine import find_routine_register_medicine, \
     find_routine_register_medicine_direction_router
-from mcp_client.agent.node.routine.get_routine_list_today import get_routine_list_today
+from mcp_client.agent.node.routine.get_routine_list_today import get_routine_list_today, \
+    get_routine_list_today_direction_router
 from mcp_client.agent.node.routine.register_routine import register_routine, register_routine_direction_router
 from mcp_client.agent.node.routine.register_routine_list import register_routine_list
 from mcp_client.agent.node.schedule.match_user_schedule import match_user_schedule, match_user_schedule_direction_router
@@ -79,6 +80,14 @@ def build_agent_graph():
             "save_conversation": "save_conversation",
             "register_routine": "register_routine",
             "get_routine_list_today": "get_routine_list_today",
+        }
+    )
+
+    graph.add_conditional_edges(
+        "get_routine_list_today",
+        get_routine_list_today_direction_router,
+        {
+            "save_conversation": "save_conversation",
         }
     )
 
