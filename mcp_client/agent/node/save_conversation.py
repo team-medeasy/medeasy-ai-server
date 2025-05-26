@@ -12,7 +12,7 @@ async def save_conversation(state: AgentState) -> AgentState:
 
     logger.info("대화 내용 저장")
     chat_session_repo.add_message(user_id=user_id, role="user", message=user_message)
-    chat_session_repo.add_message(user_id=user_id, role="system", message=final_response)
+    chat_session_repo.add_message(user_id=user_id, role="agent", message=final_response)
     logger.info("대화 내용 저장완료")
 
     return state
