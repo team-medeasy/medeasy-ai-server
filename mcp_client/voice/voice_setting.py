@@ -14,8 +14,6 @@ class VoiceSettings:
     speed: int = 0
     pitch: int = 0
     volume: int = 0
-    emotion: Optional[int] = None
-    emotion_strength: Optional[int] = None
     format: str = "mp3"
 
 class VoiceSettingRepository:
@@ -77,7 +75,12 @@ class VoiceSettingRepository:
     def get_or_default(self, user_id: str) -> VoiceSettings:
         """음성 설정 조회 (없으면 기본값)"""
         settings = self.get(user_id)
-        return settings if settings else VoiceSettings()
+        if settings:
+            return settings
+
+        else:
+            self.save(user_id, VoiceSettings())
+            return VoiceSettings()
 
     def update(self, user_id: str, **kwargs) -> bool:
         """음성 설정 부분 업데이트"""
