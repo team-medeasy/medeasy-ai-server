@@ -94,7 +94,7 @@ async def process_message_voice(
 
         # response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
         response, action = await process_user_message(user_message=user_message, user_id=int(user_id))
-        mp3_bytes = await convert_text_to_speech(response)
+        mp3_bytes = await convert_text_to_speech(user_id= int(user_id) ,text=response)
         mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
         return JSONResponse(content={
@@ -116,7 +116,7 @@ async def process_message_voice(
 async def get_routine_info(
 ):
     message = "안녕하세요, 김성북님! 오늘 복용하셔야 할 약 중에 아직 복용하지 않으신 아침약과 점심약이 있습니다. 혹시 잊으셨다면 꼭 챙기시고, 오늘도 건강 챙기시길 바랍니다. 감사합니다!"
-    mp3_bytes: bytes = await convert_text_to_speech(message)
+    mp3_bytes: bytes = await convert_text_to_speech(user_id=None, text=message)
 
     # Return the MP3 bytes directly as an audio/mpeg response
     return Response(content=mp3_bytes, media_type="audio/mpeg")

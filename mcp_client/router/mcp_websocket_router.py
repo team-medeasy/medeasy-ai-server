@@ -8,7 +8,8 @@ from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.agent.agent_types import AgentState, init_state
 from mcp_client.agent.medeasy_agent import process_user_message
 from mcp_client.service.hello_service import hello_web_socket_connection
-from mcp_client.tts import convert_text_to_speech
+# from mcp_client.tts import convert_text_to_speech
+from mcp_client.tts.clova_tts import convert_text_to_speech
 from mcp_client.util.json_converter import make_standard_response
 
 router = APIRouter()
@@ -34,7 +35,7 @@ async def websocket_message_voice(websocket: WebSocket):
 
     # 연결 성공시 인사말.
     response = await hello_web_socket_connection(jwt_token)
-    mp3_bytes = await convert_text_to_speech(response)
+    mp3_bytes = await convert_text_to_speech(user_id=int(user_id), text=response)
     mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
     await websocket.send_json(make_standard_response(
@@ -87,7 +88,7 @@ async def websocket_message_voice(websocket: WebSocket):
                 logger.info(f"사용자 메시지 요청 현재 상태 client_action: {state.get('client_action', '')}")
 
                 response, action, response_data, temp_data = await process_user_message(state=state)
-                mp3_bytes = await convert_text_to_speech(response)
+                mp3_bytes = await convert_text_to_speech(user_id=state["user_id"], text=response)
                 mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
                 # 응답 전송
@@ -107,7 +108,7 @@ async def websocket_message_voice(websocket: WebSocket):
 
             except Exception as e:
                 text_message = "요청 처리 중 오류가 발생하였습니다.."
-                audio_file = await convert_text_to_speech(text_message)
+                audio_file = await convert_text_to_speech(user_id=state["user_id"], text=text_message)
                 audio_base64 = base64.b64encode(audio_file).decode("utf-8")
 
                 await websocket.send_json(make_standard_response(

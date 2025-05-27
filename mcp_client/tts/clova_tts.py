@@ -3,6 +3,8 @@ import aiohttp
 import os
 from dotenv import load_dotenv
 import logging
+from mcp_client.voice import voice_setting_repo
+from mcp_client.voice.voice_setting import VoiceSettings
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -13,18 +15,26 @@ CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
 CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 
 
-async def convert_text_to_speech(text: str, speaker: str = "nara_call", speed: int = 0, pitch: int = 0):
+async def convert_text_to_speech(user_id:int, text: str, speaker: str = "nara_call", speed: int = 0, pitch: int = 0):
     """
     Clova Voice를 사용하여 텍스트를 음성으로 변환
 
     Args:
+        user_id: 사용자 식별자
         text: 변환할 텍스트
         speaker: 음성 화자 (nara, clara, matt, shinji, meimei, liangliang, jose, carmen)
         speed: 말하기 속도 (-5 ~ 5, 기본값 0)
         pitch: 음성 피치 (-5 ~ 5, 기본값 0)
     """
+    logger.info(f"Converting text to speech: {text[:50]}...")
     try:
-        logger.info(f"Converting text to speech: {text[:50]}...")
+        setting = None
+        if not user_id:
+            setting = VoiceSettings()
+        else:
+            setting = voice_setting_repo.get_or_default(user_id)
+
+        logger.info(f"사용자 {user_id} 음성 설정 적용: {setting.speaker}")
 
         # 요청 헤더
         headers = {
@@ -35,10 +45,10 @@ async def convert_text_to_speech(text: str, speaker: str = "nara_call", speed: i
 
         # 요청 데이터
         data = {
-            "speaker": speaker,
+            "speaker": setting.speaker,
             "volume": "0",  # 볼륨 (-5 ~ 5, 기본값 0)
-            "speed": str(speed),
-            "pitch": str(pitch),
+            "speed": str(setting.speed),
+            "pitch": str(setting.pitch),
             "format": "mp3",  # mp3 또는 wav
             "text": text
         }
