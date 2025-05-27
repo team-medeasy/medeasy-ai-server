@@ -11,7 +11,8 @@ from starlette.responses import JSONResponse, Response
 from mcp_client.chat_session_repo import chat_session_repo
 from mcp_client.client import process_user_message
 from backend.auth.jwt_token_helper import get_user_id_from_token
-from mcp_client.tts import convert_text_to_speech
+# from mcp_client.tts import convert_text_to_speech
+from mcp_client.tts.clova_tts import convert_text_to_speech
 import logging
 from mcp_client.agent.medeasy_agent import process_user_message
 
