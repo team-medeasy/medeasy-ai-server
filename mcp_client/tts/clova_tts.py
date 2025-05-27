@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import logging
 from mcp_client.voice import voice_setting_repo
+from mcp_client.voice.voice_setting import VoiceSettings
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -25,10 +26,14 @@ async def convert_text_to_speech(user_id:int, text: str, speaker: str = "nara_ca
         speed: 말하기 속도 (-5 ~ 5, 기본값 0)
         pitch: 음성 피치 (-5 ~ 5, 기본값 0)
     """
+    logger.info(f"Converting text to speech: {text[:50]}...")
     try:
-        logger.info(f"Converting text to speech: {text[:50]}...")
+        setting = None
+        if not user_id:
+            setting = VoiceSettings()
+        else:
+            setting = voice_setting_repo.get_or_default(user_id)
 
-        setting=voice_setting_repo.get_or_default(user_id)
         logger.info(f"사용자 {user_id} 음성 설정 적용: {setting.speaker}")
 
         # 요청 헤더

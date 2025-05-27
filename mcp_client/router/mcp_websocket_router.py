@@ -35,7 +35,7 @@ async def websocket_message_voice(websocket: WebSocket):
 
     # 연결 성공시 인사말.
     response = await hello_web_socket_connection(jwt_token)
-    mp3_bytes = await convert_text_to_speech(response)
+    mp3_bytes = await convert_text_to_speech(user_id=int(user_id), text=response)
     mp3_base64 = base64.b64encode(mp3_bytes).decode("utf-8")
 
     await websocket.send_json(make_standard_response(
