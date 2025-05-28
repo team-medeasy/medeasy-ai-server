@@ -206,6 +206,10 @@ async def detect_conversation_shift(state: AgentState) -> AgentState:
 
     elif state["client_action"] == "REGISTER_ROUTINE_SEARCH_MEDICINE":
         state["direction"] = "find_routine_register_medicine"
+
+    elif state["client_action"] == "DELETE_ROUTINE":
+        state["direction"] = "delete_routine"
+
     return state
 
 
@@ -401,6 +405,8 @@ def direction_router(state: AgentState) -> str:
         return "register_routine"
     elif direction == "find_routine_register_medicine":
         return "find_routine_register_medicine"
+    elif direction == "delete_routine":
+        return "delete_routine"
     else:
         # 기본 방향 (direction이 없거나 알 수 없는 값인 경우)
         return "load_tools"
