@@ -19,6 +19,10 @@ async def check_client_actions(state: AgentState) -> AgentState:
             state["client_action"] = "REGISTER_ROUTINE"
             state['direction'] = 'register_routine'
 
+        elif name == 'delete_medication_routine':
+            state["client_action"] = "DELETE_ROUTINE"
+            state['direction'] = 'delete_routine'
+
     return state
 
 def check_client_actions_direction_router(state: AgentState) -> str:
@@ -26,10 +30,9 @@ def check_client_actions_direction_router(state: AgentState) -> str:
     # 캡처 요청이 있는 경우
     if state.get("client_action") in ["CAPTURE_PRESCRIPTION", "CAPTURE_PILLS_PHOTO"]:
         return "capture"
-
-    # 루틴 등록 도구가 호출된 경우
     elif state.get("direction") == "register_routine":
         return "register_routine"
-
+    elif state.get("direction") == "delete_routine":
+        return "delete_routine"
     else:
         return "execute_tools"

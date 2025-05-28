@@ -343,3 +343,31 @@ async def register_single_routine(
         if resp.status_code >= 400:
             raise HTTPException(status_code=502, detail=f"루틴 생성 실패: {resp.text}")
         return resp.json()
+
+
+async def get_medicines_current(
+        jwt_token: str,
+):
+    api_url = f"{medeasy_api_url}/user/medicines/current"
+
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(api_url, headers=headers)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"현재 복용 중인 루틴 그룹 조회 실패: {resp.text}")
+        result = resp.json()
+        return result.get("body", {})
+
+async def delete_routine_group(
+        jwt_token: str,
+        routine_group_id: int,
+):
+    api_url = f"{medeasy_api_url}/routine/group/routine_group_id/{routine_group_id}"
+
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.delete(api_url, headers=headers)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"루틴 그룹 삭제 실패: {resp.text}")
+        result = resp.json()
+        return result.get("body", {})

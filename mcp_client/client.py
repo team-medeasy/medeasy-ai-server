@@ -29,7 +29,8 @@ config_path = os.getenv("MCP_CONFIG_PATH", "/app/mcp_client_config/medeasy_mcp_c
 
 # Create LLM
 gpt_nano= ChatOpenAI(model_name="gpt-4.1-nano")
-final_response_llm= ChatOpenAI(model_name="gpt-4.1-mini")
+gpt_mini= ChatOpenAI(model_name="gpt-4.1-mini")
+final_response_llm= ChatOpenAI(model_name="gpt-4.1-mini", max_tokens=1500)
 tool_llm = ChatOpenAI(model_name="gpt-4.1-mini")
 
 # SSE 연결 오류를 위한 재시도 데코레이터

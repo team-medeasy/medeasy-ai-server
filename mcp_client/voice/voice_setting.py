@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VoiceSettings:
     """음성 설정 데이터 클래스"""
-    speaker: str = "nara"
+    speaker: str = "vara"
     speed: int = 0
     pitch: int = 0
     volume: int = 0
