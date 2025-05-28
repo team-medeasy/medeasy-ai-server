@@ -114,9 +114,18 @@ async def process_message_voice(
             ai 사운드 테스트
             """)
 async def get_routine_info(
+        authorization: str = Header(None)  # Authorization 헤더에서 토큰 가져오기
 ):
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "")
+
+    if token is None:
+        raise HTTPException(status_code=403, detail=f"Invalid Format Authorization Token")
+
+    user_id = get_user_id_from_token(token)
     message = "안녕하세요, 김성북님! 오늘 복용하셔야 할 약 중에 아직 복용하지 않으신 아침약과 점심약이 있습니다. 혹시 잊으셨다면 꼭 챙기시고, 오늘도 건강 챙기시길 바랍니다. 감사합니다!"
-    mp3_bytes: bytes = await convert_text_to_speech(user_id=None, text=message)
+    mp3_bytes: bytes = await convert_text_to_speech(user_id=int(user_id), text=message)
 
     # Return the MP3 bytes directly as an audio/mpeg response
     return Response(content=mp3_bytes, media_type="audio/mpeg")
