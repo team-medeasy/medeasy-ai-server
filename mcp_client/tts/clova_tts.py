@@ -74,21 +74,3 @@ async def convert_text_to_speech(user_id:int, text: str, speaker: str = "nara_ca
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Clova Voice TTS Error: {str(e)}")
-
-
-# 사용 가능한 화자 목록
-AVAILABLE_SPEAKERS = {
-    "nara": "한국어 여성 음성 (밝은 톤)",
-    "clara": "한국어 여성 음성 (차분한 톤)",
-    "matt": "영어 남성 음성",
-    "shinji": "일본어 남성 음성",
-    "meimei": "중국어 여성 음성",
-    "liangliang": "중국어 남성 음성",
-    "jose": "스페인어 남성 음성",
-    "carmen": "스페인어 여성 음성"
-}
-
-
-def get_available_speakers():
-    """사용 가능한 화자 목록 반환"""
-    return AVAILABLE_SPEAKERS
