@@ -13,6 +13,8 @@ from mcp_client.agent.node.medicine.find_medicine_details import find_medicine_d
 from mcp_client.agent.node.medicine.find_routine_register_medicine import find_routine_register_medicine, \
     find_routine_register_medicine_direction_router
 from mcp_client.agent.node.routine.delete_routine import delete_routine, delete_routine_direction_router
+from mcp_client.agent.node.routine.delete_routine_select import delete_routine_select, \
+    delete_routine_select_direction_router
 from mcp_client.agent.node.routine.get_routine_list_today import get_routine_list_today, \
     get_routine_list_today_direction_router
 from mcp_client.agent.node.routine.register_routine import register_routine, register_routine_direction_router
@@ -41,6 +43,7 @@ def build_agent_graph():
     graph.add_node("match_user_schedule", match_user_schedule)
 
     graph.add_node("delete_routine", delete_routine)
+    graph.add_node("delete_routine_select", delete_routine_select)
 
     graph.add_node("load_tools", load_tools)
     graph.add_node("generate_initial_response", generate_initial_response)
@@ -71,6 +74,7 @@ def build_agent_graph():
             "register_routine": "register_routine",
             "find_routine_register_medicine": "find_routine_register_medicine",
             "delete_routine": "delete_routine",
+            "delete_routine_select": "delete_routine_select",
         }
     )
 
@@ -127,6 +131,14 @@ def build_agent_graph():
     graph.add_conditional_edges(
         "delete_routine",
         delete_routine_direction_router,
+        {
+            "save_conversation": "save_conversation",
+        }
+    )
+
+    graph.add_conditional_edges(
+        "delete_routine_select",
+        delete_routine_select_direction_router,
         {
             "save_conversation": "save_conversation",
         }
