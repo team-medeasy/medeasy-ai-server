@@ -78,6 +78,7 @@ tool_selector_system_prompt = f"""
     
     * delete_medication_routine * 
      - 사용자가 복약 일정을 삭제하고 싶을 때 사용하는 도구입니다.
+     - 사용자가 복약 일정 삭제 의사를 밝히면 호출하세요 (예: "복약(루틴) 일정을 삭제하고 싶어") 
     
 """
 
