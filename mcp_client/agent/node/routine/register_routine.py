@@ -33,6 +33,13 @@ register_routine_prompt = """
         "user_schedule_names": "사용자가 '아침과 점심에 먹겠다'고 시간대를 명확히 지정했습니다.",
         "total_quantity": "사용자가 '총 6알 있다'고 보유 수량을 언급했습니다.",
         "dose_days": "사용자가 '3일간 복용 예정'이라고 기간을 명시했습니다."
+    },
+    "conversation_flow": {
+        "current_intent": "register_routine",
+        "flow_changed": false,
+        "new_intent": null,
+        "confidence": 0.95,
+        "reasoning": "사용자가 복용 일정 등록과 관련된 내용만 언급하여 대화 흐름이 유지되고 있습니다."
     }
 }
 
@@ -62,6 +69,17 @@ extraction_reasoning 필드 작성 가이드:
 - 사용자 메시지의 어떤 부분에서 해당 정보를 추출했는지 설명하세요.
 - null 값인 경우 "해당 정보가 메시지에 언급되지 않았습니다"라고 작성하세요.
 - 이전 대화 내역을 참고한 경우 그 내용도 명시하세요.
+
+conversation_flow 분석 가이드:
+- current_intent: "register_routine" (고정)
+- flow_changed: 복용 일정 등록이 아닌 다른 의도가 감지되면 true
+- new_intent: 새로 감지된 의도 ("view_routine", "register_prescription_routine", "medication_check" 등)
+- confidence: 의도 판단의 확실성 (0.7 이상이면 흐름 변경으로 판단)
+- reasoning: 구체적인 판단 근거 설명
+
+흐름 변경을 감지하는 키워드 예시:
+사용자가 복약 일정 등록과 무관한 요청을 한경우 지금 수행 중인 복약 일정 등록 사이클을 벗어나야함.
+ex) 처방전 등록, 알약 촬영 등록, 복약 체크, 오늘 복약 정보 조회, 복약 삭제, 목소리 변환 등
 """
 async def register_routine(state: AgentState)->AgentState:
     """
@@ -109,9 +127,17 @@ async def register_routine(state: AgentState)->AgentState:
 
     llm_response= await final_response_llm.ainvoke(messages)
     # LLM 응답에서 JSON 파싱
-    parsed_data, extraction_reasoning = parse_llm_response_with_reasoning(llm_response.content)
+    parsed_data, extraction_reasoning, conversation_flow = parse_llm_response_with_reasoning(llm_response.content)
     logger.info(f"parsed_data: {parsed_data}")
     logger.info(f"extraction_reasoning: {extraction_reasoning}")
+    logger.info(f"conversation_flow: {conversation_flow}")
+
+    if conversation_flow["flow_changed"]:
+        state["direction"] = "load_tools"
+        state["client_action"] = None
+        state["temp_data"] = None
+        state["response_data"] = None
+        return state
 
     if not parsed_data and not state["temp_data"]["medicine_id"] and not state["temp_data"]["user_schedule_ids"]:
         state["final_response"] = "복용 일정 등록에 필요한 약 이름, 복용량, 복용 시간 정보를 말씀해 주세요."
@@ -247,14 +273,14 @@ def parse_llm_response(response_content: str) -> Optional[Dict[str, Any]]:
 
 
 def parse_llm_response_with_reasoning(response_content):
-    """LLM 응답에서 JSON을 파싱하고 extracted_data와 extraction_reasoning을 분리"""
+    """LLM 응답에서 JSON을 파싱하고 extracted_data, extraction_reasoning, conversation_flow를 분리"""
     try:
         # 1. JSON 부분만 추출 (중괄호로 둘러싸인 부분)
         json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
 
         if not json_match:
             logger.warning("응답에서 JSON 형식을 찾을 수 없습니다.")
-            return None, None
+            return None, None, None
 
         json_str = json_match.group()
         # logger.info(f"추출된 JSON 문자열: {json_str}")
@@ -275,44 +301,92 @@ def parse_llm_response_with_reasoning(response_content):
                 "dose_days": parsed_response.get("dose_days")
             }
             extraction_reasoning = {}
+            # 기존 형식에서는 conversation_flow 기본값 설정
+            conversation_flow = {
+                "current_intent": "register_routine",
+                "flow_changed": False,
+                "new_intent": None,
+                "confidence": 1.0,
+                "reasoning": "기존 형식 응답으로 conversation_flow 기본값 설정"
+            }
         else:
-            # 4. extracted_data와 extraction_reasoning 분리
+            # 4. extracted_data, extraction_reasoning, conversation_flow 분리
             extracted_data = parsed_response.get("extracted_data", {})
             extraction_reasoning = parsed_response.get("extraction_reasoning", {})
+            conversation_flow = parsed_response.get("conversation_flow", {
+                "current_intent": "register_routine",
+                "flow_changed": False,
+                "new_intent": None,
+                "confidence": 1.0,
+                "reasoning": "conversation_flow 필드가 없어 기본값 설정"
+            })
 
-        # 5. 추출된 데이터 검증 및 로깅
+        # 5. conversation_flow 필드 검증 및 기본값 보정
+        if not isinstance(conversation_flow, dict):
+            logger.warning("conversation_flow가 dict 타입이 아닙니다. 기본값으로 설정합니다.")
+            conversation_flow = {
+                "current_intent": "register_routine",
+                "flow_changed": False,
+                "new_intent": None,
+                "confidence": 1.0,
+                "reasoning": "conversation_flow 타입 오류로 기본값 설정"
+            }
+
+        # conversation_flow 필수 필드 확인 및 기본값 설정
+        default_flow = {
+            "current_intent": "register_routine",
+            "flow_changed": False,
+            "new_intent": None,
+            "confidence": 1.0,
+            "reasoning": "필수 필드 누락으로 기본값 설정"
+        }
+
+        for key, default_value in default_flow.items():
+            if key not in conversation_flow:
+                conversation_flow[key] = default_value
+                logger.warning(f"conversation_flow에서 {key} 필드가 누락되어 기본값으로 설정했습니다.")
+
+        # 6. 추출된 데이터 검증 및 로깅
         # logger.info(f"추출된 데이터: {extracted_data}")
         # logger.info(f"추출 이유: {extraction_reasoning}")
+        # logger.info(f"대화 흐름: {conversation_flow}")
 
-        # 6. 필수 필드 존재 여부 확인
+        # 7. 필수 필드 존재 여부 확인
         required_fields = ["medicine_name", "dose", "user_schedule_names", "total_quantity"]
         missing_fields = [field for field in required_fields if field not in extracted_data]
         if missing_fields:
             logger.warning(f"누락된 필드: {missing_fields}")
 
-        # 7. 데이터 타입 검증
+        # 8. 데이터 타입 검증
         if extracted_data.get("dose") is not None and not isinstance(extracted_data["dose"], (int, float)):
             logger.warning(f"dose 필드의 타입이 올바르지 않습니다: {type(extracted_data['dose'])}")
 
-        if extracted_data.get("total_quantity") is not None and not isinstance(extracted_data["total_quantity"],
-                                                                               (int, float)):
+        if extracted_data.get("total_quantity") is not None and not isinstance(extracted_data["total_quantity"], (int, float)):
             logger.warning(f"total_quantity 필드의 타입이 올바르지 않습니다: {type(extracted_data['total_quantity'])}")
 
-        if extracted_data.get("user_schedule_names") is not None and not isinstance(
-                extracted_data["user_schedule_names"], list):
+        if extracted_data.get("user_schedule_names") is not None and not isinstance(extracted_data["user_schedule_names"], list):
             logger.warning(f"user_schedule_names 필드의 타입이 올바르지 않습니다: {type(extracted_data['user_schedule_names'])}")
 
-        return extracted_data, extraction_reasoning
+        # 9. conversation_flow 타입 검증
+        if not isinstance(conversation_flow.get("flow_changed"), bool):
+            logger.warning("flow_changed 필드가 boolean 타입이 아닙니다.")
+            conversation_flow["flow_changed"] = False
+
+        if not isinstance(conversation_flow.get("confidence"), (int, float)):
+            logger.warning("confidence 필드가 숫자 타입이 아닙니다.")
+            conversation_flow["confidence"] = 1.0
+
+        return extracted_data, extraction_reasoning, conversation_flow
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON 디코딩 오류: {e}")
         logger.error(f"문제가 된 JSON 문자열: {json_str if 'json_str' in locals() else 'N/A'}")
-        return None, None
+        return None, None, None
 
     except Exception as e:
         logger.error(f"예상치 못한 파싱 오류: {e}")
         logger.error(f"응답 내용: {response_content}")
-        return None, None
+        return None, None, None
 
 
 def extract_json_from_text(text: str) -> Optional[str]:
