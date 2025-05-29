@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 from backend.db.elastic import es, INDEX_NAME
 
 
-async def search_pills(features: Dict[str, Any], top_k: int = 7) -> List[Dict[str, Any]]:
+async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[str, Any]]:
     try:
         # features가 문자열(str)이라면 JSON으로 변환
         if isinstance(features, str):
@@ -31,7 +31,7 @@ async def search_pills(features: Dict[str, Any], top_k: int = 7) -> List[Dict[st
             return []
 
         # 점수 기반 필터링 적용
-        filtered_results = filter_results_by_score(raw_results)
+        filtered_results = filter_results_by_score(results=raw_results, min_results=1, max_results=top_k)
 
         logger.info(f"원본 결과 수: {len(raw_results)}, 필터링 후 결과 수: {len(filtered_results)}")
 
@@ -47,7 +47,7 @@ async def search_pills(features: Dict[str, Any], top_k: int = 7) -> List[Dict[st
 
 def filter_results_by_score(results: List[Dict[str, Any]],
                             min_results: int = 1,
-                            max_results: int = 8,
+                            max_results: int = 5,
                             score_threshold_ratio: float = 0.5) -> List[Dict[str, Any]]:
     """
     점수 분포를 분석하여 의미 있는 결과만 필터링
