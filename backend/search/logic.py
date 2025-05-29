@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 from backend.db.elastic import es, INDEX_NAME
 
-async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[str, Any]]:
+
+async def search_pills(features: Dict[str, Any], top_k: int = 7) -> List[Dict[str, Any]]:
     try:
         # features가 문자열(str)이라면 JSON으로 변환
         if isinstance(features, str):
@@ -21,14 +22,133 @@ async def search_pills(features: Dict[str, Any], top_k: int = 5) -> List[Dict[st
         norm_features = preprocess_features(features)
         query_body = build_es_query(norm_features, top_k)
         logger.warning(f"QUERY BODY:\n{json.dumps(query_body, indent=2, ensure_ascii=False)}")
+
         response = await es.search(index=INDEX_NAME, body=query_body)
-        return response["hits"]["hits"]
+        raw_results = response["hits"]["hits"]
+
+        if not raw_results:
+            logger.info("검색 결과가 없습니다.")
+            return []
+
+        # 점수 기반 필터링 적용
+        filtered_results = filter_results_by_score(raw_results)
+
+        logger.info(f"원본 결과 수: {len(raw_results)}, 필터링 후 결과 수: {len(filtered_results)}")
+
+        return filtered_results
+
     except json.JSONDecodeError:
         logger.error("❌ JSON decoding failed: Invalid JSON format.", exc_info=True)
         return []
     except Exception as e:
         logger.error(f"❌ Pill search failed: {e}", exc_info=True)
         return []
+
+
+def filter_results_by_score(results: List[Dict[str, Any]],
+                            min_results: int = 1,
+                            max_results: int = 8,
+                            score_threshold_ratio: float = 0.5) -> List[Dict[str, Any]]:
+    """
+    점수 분포를 분석하여 의미 있는 결과만 필터링
+
+    Args:
+        results: 검색 결과 리스트
+        min_results: 최소 반환할 결과 수
+        max_results: 최대 반환할 결과 수
+        score_threshold_ratio: 1등 대비 점수 비율 임계값
+
+    Returns:
+        필터링된 결과 리스트
+    """
+    if not results:
+        return []
+
+    # 점수 추출 및 정렬 (이미 정렬되어 있지만 확실히)
+    scores = [hit["_score"] for hit in results]
+    logger.info(f"검색 결과 점수들: {scores}")
+
+    if len(results) <= min_results:
+        logger.info(f"결과가 {min_results}개 이하이므로 모든 결과 반환")
+        return results
+
+    # 1등 점수
+    top_score = scores[0]
+
+    # 점수 차이 분석
+    score_gaps = []
+    for i in range(len(scores) - 1):
+        gap = scores[i] - scores[i + 1]
+        gap_ratio = gap / top_score if top_score > 0 else 0
+        score_gaps.append({
+            'position': i + 1,
+            'gap': gap,
+            'gap_ratio': gap_ratio,
+            'current_score': scores[i],
+            'next_score': scores[i + 1]
+        })
+
+    logger.info(f"점수 차이 분석: {score_gaps}")
+
+    # 필터링 로직
+    cutoff_position = len(results)  # 기본적으로 모든 결과 포함
+
+    # 방법 1: 큰 점수 차이가 있는 지점에서 자르기
+    for gap_info in score_gaps:
+        if gap_info['gap_ratio'] > 0.15:  # 1등 대비 15% 이상 차이나는 지점
+            cutoff_position = gap_info['position']
+            logger.info(f"큰 점수 차이 발견: {gap_info['position']}등에서 {gap_info['gap']:.2f}점 차이")
+            break
+
+    # 방법 2: 1등 대비 임계값 이하인 결과들 제거
+    threshold_score = top_score * score_threshold_ratio
+    threshold_cutoff = len(results)
+
+    for i, score in enumerate(scores):
+        if score < threshold_score:
+            threshold_cutoff = i
+            logger.info(f"임계값({threshold_score:.2f}) 이하 점수 발견: {i + 1}등부터 제외")
+            break
+
+    # 두 방법 중 더 보수적인 것 선택 (더 많은 결과 포함)
+    final_cutoff = max(min(cutoff_position, threshold_cutoff), min_results)
+    final_cutoff = min(final_cutoff, max_results)
+
+    logger.info(f"최종 cutoff 위치: {final_cutoff}")
+
+    # 결과 필터링
+    filtered_results = results[:final_cutoff]
+
+    # 필터링 결과 로깅
+    filtered_scores = [hit["_score"] for hit in filtered_results]
+    logger.info(f"필터링된 결과 점수들: {filtered_scores}")
+
+    return filtered_results
+
+
+def analyze_score_distribution(scores: List[float]) -> Dict[str, Any]:
+    """
+    점수 분포 분석을 위한 헬퍼 함수
+    """
+    if not scores:
+        return {}
+
+    import statistics
+
+    analysis = {
+        'count': len(scores),
+        'max': max(scores),
+        'min': min(scores),
+        'range': max(scores) - min(scores),
+        'mean': statistics.mean(scores),
+        'median': statistics.median(scores)
+    }
+
+    if len(scores) > 1:
+        analysis['std_dev'] = statistics.stdev(scores)
+        analysis['coefficient_of_variation'] = analysis['std_dev'] / analysis['mean'] if analysis['mean'] > 0 else 0
+
+    return analysis
 
 async def search_medicine_by_item_seq(item_seq: str)-> Dict[str, Any]:
     try:
