@@ -19,7 +19,7 @@ async def search_by_text(
     imprint: Optional[str] = Query(None, description="약품 인쇄 문자 또는 마크 코드"),
     drug_shape: Optional[str] = Query(None, description="약품 모양"),
     color_classes: Optional[str] = Query(None, description="약품 색상"),
-    top_k: int = Query(5, ge=1, le=20, description="반환할 결과 수")
+    top_k: int = Query(8, ge=1, le=20, description="반환할 결과 수")
 ):
     """
     텍스트 기반 검색 API:
