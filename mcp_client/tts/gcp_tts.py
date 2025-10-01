@@ -8,16 +8,16 @@ import logging
 logger = logging.getLogger(__name__)
 load_dotenv()
 
-credentials_path = os.getenv("GCP_TTS_CREDENTIALS_PATH")
+credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 credentials = service_account.Credentials.from_service_account_file(credentials_path)
 client = texttospeech_v1beta1.TextToSpeechAsyncClient(credentials=credentials)
 
-async def convert_text_to_speech(request: str):
+async def convert_text_to_speech(user_id:int, text: str):
     try:
-        logger.info(f"Converting {request}")
+        logger.info(f"Converting {text}")
         # dict 형태로 요청 생성
         request_dict = {
-            "input": {"text": request},
+            "input": {"text": text},
             "voice": {
                 "language_code": "ko-KR",
                 "name": "ko-KR-Neural2-C"  # 이 부분을 Neural2 음성 이름으로 변경합니다.
