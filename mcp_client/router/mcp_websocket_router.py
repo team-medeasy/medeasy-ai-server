@@ -8,8 +8,8 @@ from backend.auth.jwt_token_helper import get_user_id_from_token
 from mcp_client.agent.agent_types import AgentState, init_state
 from mcp_client.agent.medeasy_agent import process_user_message
 from mcp_client.service.hello_service import hello_web_socket_connection
-# from mcp_client.tts import convert_text_to_speech
-from mcp_client.tts.clova_tts import convert_text_to_speech
+from mcp_client.tts.gcp_tts import convert_text_to_speech
+# from mcp_client.tts.clova_tts import convert_text_to_speech
 from mcp_client.util.json_converter import make_standard_response
 
 router = APIRouter()

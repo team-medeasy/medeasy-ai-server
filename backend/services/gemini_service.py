@@ -30,7 +30,7 @@ try:
 except Exception as e:
     logger.error(f"❌ Vertex AI 초기화 오류: {e}")
 
-model_name = "gemini-1.5-flash-002"
+model_name = "gemini-2.5-flash"
 try:
     model = GenerativeModel(model_name)
     logger.info(f"✅ Gemini 모델 '{model_name}' 로드 완료")
